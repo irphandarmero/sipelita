@@ -13,6 +13,7 @@ class MasterLaporan extends Model
 
     protected $fillable = [
         'nama_laporan',
+        'jenis_laporan',
         'deskripsi',
         'status_aktif',
     ];
