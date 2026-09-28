@@ -127,6 +127,7 @@
             flex: 1;
         }
 
+        /* Badges & Cards */
         .badge-role {
             font-size: 0.725rem;
             padding: 0.35em 0.65em;
@@ -279,8 +280,8 @@
                             <small class="text-muted">{{ Auth::user()->email ?? '' }}</small>
                         </li>
                         <li>
-                            <a class="dropdown-item py-2" href="#">
-                                <i class="bi bi-person me-2 text-primary"></i>Profil Saya
+                            <a class="dropdown-item py-2" href="{{ route('password.change') }}">
+                                <i class="bi bi-key me-2 text-warning"></i>Ubah Password
                             </a>
                         </li>
                         <li><hr class="dropdown-divider"></li>
@@ -334,7 +335,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
-        // Toggle Sidebar Navigasi
+        // Sidebar Toggle Script
         const sidebar = document.getElementById('sidebar');
         const contentWrapper = document.getElementById('content-wrapper');
         const sidebarToggle = document.getElementById('sidebarToggle');

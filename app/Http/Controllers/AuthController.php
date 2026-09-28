@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
@@ -69,5 +70,46 @@ class AuthController extends Controller
 
         return redirect()->route('login')
             ->with('success', 'Anda telah berhasil keluar dari sistem SI-PELITA.');
+    }
+
+    /**
+     * Menampilkan form ubah password pengguna.
+     */
+    public function showChangePasswordForm()
+    {
+        return view('auth.change-password');
+    }
+
+    /**
+     * Memproses pembaruan password pengguna yang sedang login.
+     */
+    public function updatePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => ['required', 'string'],
+            'password'         => ['required', 'string', 'min:8', 'confirmed', 'different:current_password'],
+        ], [
+            'current_password.required' => 'Password saat ini wajib diisi.',
+            'password.required'         => 'Password baru wajib diisi.',
+            'password.min'              => 'Password baru minimal 8 karakter.',
+            'password.confirmed'        => 'Konfirmasi password baru tidak cocok.',
+            'password.different'        => 'Password baru harus berbeda dengan password saat ini.',
+        ]);
+
+        $user = Auth::user();
+
+        // Periksa apakah password saat ini benar
+        if (!Hash::check($request->current_password, $user->password)) {
+            return back()->withErrors([
+                'current_password' => 'Password saat ini tidak sesuai.',
+            ]);
+        }
+
+        // Perbarui password dengan enkripsi Hash
+        $user->update([
+            'password' => Hash::make($request->password)
+        ]);
+
+        return redirect()->back()->with('success', 'Password Anda berhasil diperbarui!');
     }
 }
