@@ -53,7 +53,7 @@
                             @error('master_laporan_id')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
-                            <small class="text-muted d-block mt-1">Pilih kategori yang paling menggambarkan jenis laporan.</small>
+                            <!-- <small class="text-muted d-block mt-1">Pilih kategori yang paling menggambarkan jenis laporan.</small> -->
                         </div>
 
                         <!-- 3. UNIT TUJUAN PENANGGUNG JAWAB (Konek ke Model UnitKerja) -->
@@ -73,7 +73,7 @@
                             @error('unit_tujuan_id')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
-                            <small class="text-muted d-block mt-1">Pilih unit yang bertugas menangani masalah ini (misal: SIMRS / IPSRS / Direksi).</small>
+                            <!-- <small class="text-muted d-block mt-1">Pilih unit yang bertugas menangani masalah ini (misal: SIMRS / IPSRS / Direksi).</small> -->
                         </div>
 
                         <!-- 4. JUDUL LAPORAN -->
@@ -120,7 +120,20 @@
                             @enderror
                         </div>
 
-                        <!-- 7. UPLOAD LAMPIRAN / BUKTI FOTO -->
+                        <!-- 7. DESKRIPSI KEJADIAN / RINCIAN -->
+                        <div class="col-12">
+                            <label for="deskripsi_kejadian" class="form-label fw-bold small text-dark">
+                                Rincian Kejadian / Isi Laporan <span class="text-danger">*</span>
+                            </label>
+                            <textarea name="deskripsi_kejadian" id="deskripsi_kejadian" rows="4" 
+                                      class="form-control @error('deskripsi_kejadian') is-invalid @enderror" 
+                                      placeholder="Jelaskan secara rinci kondisi masalah, lokasi tepatnya, atau data sensus yang dilaporkan..." required>{{ old('deskripsi_kejadian') }}</textarea>
+                            @error('deskripsi_kejadian')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <!-- 8. UPLOAD LAMPIRAN / BUKTI FOTO -->
                         <div class="col-md-6">
                             <label for="lampiran" class="form-label fw-bold small text-dark">
                                 Lampiran Bukti / Foto Kerusakan <small class="text-muted fw-normal">(Opsional)</small>
@@ -132,19 +145,6 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                             <small class="text-muted d-block mt-1">Format: JPG, PNG, PDF (Maks. 2MB).</small>
-                        </div>
-
-                        <!-- 8. DESKRIPSI KEJADIAN / RINCIAN -->
-                        <div class="col-12">
-                            <label for="deskripsi_kejadian" class="form-label fw-bold small text-dark">
-                                Rincian Kejadian / Isi Laporan <span class="text-danger">*</span>
-                            </label>
-                            <textarea name="deskripsi_kejadian" id="deskripsi_kejadian" rows="4" 
-                                      class="form-control @error('deskripsi_kejadian') is-invalid @enderror" 
-                                      placeholder="Jelaskan secara rinci kondisi masalah, lokasi tepatnya, atau data sensus yang dilaporkan..." required>{{ old('deskripsi_kejadian') }}</textarea>
-                            @error('deskripsi_kejadian')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
                         </div>
 
                         <!-- 9. TINDAKAN AWAL SEBELUMNYA -->

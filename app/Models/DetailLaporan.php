@@ -62,4 +62,9 @@ class DetailLaporan extends Model
     {
         return $this->hasMany(RiwayatLaporan::class, 'detail_laporan_id')->orderBy('created_at', 'asc');
     }
+
+    public function disposisiLaporan()
+    {
+        return $this->hasMany(DisposisiLaporan::class, 'detail_laporan_id')->orderBy('tanggal_disposisi', 'asc');
+    }
 }

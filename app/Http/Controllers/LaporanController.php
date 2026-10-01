@@ -167,10 +167,16 @@ class LaporanController extends Controller
             'unitTujuan',
             'masterLaporan',
             'petugasPenangan',
-            'riwayatLaporan.user'
+            'riwayatLaporan.user',
+            'disposisiLaporan.unitPengirim',
+            'disposisiLaporan.unitPenerima',
+            'disposisiLaporan.userPengirim',
+            'disposisiLaporan.userPenerima',
         ])->findOrFail($id);
 
-        return view('laporan.show', compact('laporan'));
+        $unitKerjaList = UnitKerja::where('id', '!=', Auth::user()->unit_kerja_id)->get();
+        
+        return view('laporan.show', compact('laporan', 'unitKerjaList'));
     }
 
     /**
@@ -187,6 +193,26 @@ class LaporanController extends Controller
         ]);
 
         $laporan = DetailLaporan::findOrFail($id);
+        // 1. Otorisasi Hak Akses Unit
+        if (Auth::user()->role !== 'admin' && Auth::user()->unit_kerja_id != $laporan->unit_tujuan_id) {
+            return redirect()->back()->with('error', 'Anda tidak memiliki hak akses untuk menindaklanjuti atau mengubah status laporan unit ini.');
+        }
+
+        // 2. Validasi Status Laporan jika sudah Selesai / Ditolak
+        if (in_array($laporan->status_laporan, ['Selesai', 'Ditolak']) && Auth::user()->role !== 'admin') {
+            return redirect()->back()->with('error', "Laporan berstatus '{$laporan->status_laporan}' tidak dapat diubah statusnya.");
+        }
+
+        // 3. Validasi Keterkaitan Disposisi jika Status Diubah menjadi Selesai
+        if ($request->status_baru === 'Selesai') {
+            $pendingDisposisiCount = $laporan->disposisiLaporan()
+                ->whereIn('status_disposisi', ['Menunggu', 'Diproses'])
+                ->count();
+
+            if ($pendingDisposisiCount > 0) {
+                return redirect()->back()->with('error', "Laporan tidak dapat diselesaikan karena masih terdapat {$pendingDisposisiCount} tugas disposisi ke unit lain yang berstatus Menunggu atau Diproses.");
+            }
+        }
         $statusSebelumnya = $laporan->status_laporan;
 
         // Update data laporan

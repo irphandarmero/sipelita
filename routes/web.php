@@ -1,8 +1,10 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\LaporanController;
+use App\Http\Controllers\DisposisiLaporanController;
 use App\Http\Controllers\UnitKerjaController;
 use App\Http\Controllers\MasterLaporanController;
 use App\Http\Controllers\UserController;
@@ -68,7 +70,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/{id}', [LaporanController::class, 'show'])->name('show');          // Detail & Audit Trail
         Route::patch('/{id}/status', [LaporanController::class, 'updateStatus'])->name('updateStatus'); // Update Status
     });
+    // ----------------------------------------------------------------------
+    // Disposisi Laporan Lintas-Unit
+    // ----------------------------------------------------------------------
+    Route::prefix('disposisi')->name('disposisi.')->group(function () {
+        Route::post('/{laporanId}', [DisposisiLaporanController::class, 'store'])->name('store');            // Kirim Disposisi Baru
+        Route::patch('/{id}/status', [DisposisiLaporanController::class, 'updateStatus'])->name('updateStatus'); // Update Status Disposisi
+        Route::delete('/{id}', [DisposisiLaporanController::class, 'destroy'])->name('destroy');             // Batal/Hapus Disposisi
+    });
 
+    // 
     // ----------------------------------------------------------------------
     // Master Data (Khusus Admin)
     // ----------------------------------------------------------------------
