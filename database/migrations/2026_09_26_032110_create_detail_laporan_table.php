@@ -24,8 +24,10 @@ return new class extends Migration {
             $table->text('deskripsi_kejadian'); 
             $table->text('tindakan_awal')->nullable(); 
             $table->string('lampiran_file')->nullable(); // Prioritas &amp; Status 
-            $table->enum('prioritas', ['Rendah', 'Sedang', 'Tinggi', 'Darurat'])->default('Sedang'); $table->enum('status_laporan', ['Draft', 'Diajukan', 'Diproses', 'Selesai', 'Ditolak'])->default('Diajukan'); // Penanganan &amp; SLA 
-            $table->foreignId('petugas_penangan_id')->nullable()->constrained('users')->nullOnDelete(); $table->dateTime('tanggal_penyelesaian')->nullable(); 
+            $table->enum('prioritas', ['Rendah', 'Sedang', 'Tinggi', 'Darurat'])->default('Sedang'); 
+            $table->enum('status_laporan', ['Draft', 'Diajukan', 'Diproses', 'Selesai', 'Ditolak'])->default('Diajukan'); // Penanganan &amp; SLA 
+            $table->foreignId('petugas_penangan_id')->nullable()->constrained('users')->nullOnDelete(); 
+            $table->dateTime('tanggal_penyelesaian')->nullable(); 
             $table->text('catatan_admin')->nullable(); 
             $table->timestamps();
             }

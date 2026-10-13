@@ -16,6 +16,7 @@ class DisposisiLaporan extends Model
         'unit_pengirim_id',
         'unit_penerima_id',
         'petugas_disposisi_id',
+        'petugas_tindak_lanjut_id',
         'catatan_disposisi',
         'catatan_tindak_lanjut',
         'status_disposisi',
@@ -45,8 +46,8 @@ class DisposisiLaporan extends Model
         return $this->belongsTo(User::class, 'petugas_disposisi_id');
     }
 
-    public function userPenerima()
+    public function petugasTindakLanjut()
     {
-        return $this->belongsTo(User::class, 'petugas_disposisi_id');
+        return $this->belongsTo(User::class, 'petugas_tindak_lanjut_id');
     }
 }

@@ -41,12 +41,26 @@ Route::middleware('auth')->group(function () {
 
     // Dashboard Utama
     Route::get('/dashboard', function () {
-         $totalLaporan  = DetailLaporan::count();
-        $diajukanCount = DetailLaporan::where('status_laporan', 'Diajukan')->count();
-        $diprosesCount = DetailLaporan::where('status_laporan', 'Diproses')->count();
-        $selesaiCount  = DetailLaporan::where('status_laporan', 'Selesai')->count();
+        $laporanQuery = DetailLaporan::query();
+        if (!in_array(Auth::user()->role, ['admin', 'direksi'])) {
+            $unitId = Auth::user()->unit_kerja_id;
+            $laporanQuery->where(function ($query) use ($unitId) {
+                $query->where('user_id', Auth::id())
+                    ->orWhere('unit_asal_id', $unitId)
+                    ->orWhere('unit_tujuan_id', $unitId)
+                    ->orWhereHas('disposisiLaporan', function ($disposisiQuery) use ($unitId) {
+                        $disposisiQuery->where('unit_pengirim_id', $unitId)
+                            ->orWhere('unit_penerima_id', $unitId);
+                    });
+            });
+        }
 
-        $laporanTerbaru = DetailLaporan::with(['user', 'unitAsal', 'unitTujuan', 'masterLaporan'])
+        $totalLaporan  = (clone $laporanQuery)->count();
+        $diajukanCount = (clone $laporanQuery)->where('status_laporan', 'Diajukan')->count();
+        $diprosesCount = (clone $laporanQuery)->where('status_laporan', 'Diproses')->count();
+        $selesaiCount  = (clone $laporanQuery)->where('status_laporan', 'Selesai')->count();
+
+        $laporanTerbaru = (clone $laporanQuery)->with(['user', 'unitAsal', 'unitTujuan', 'masterLaporan'])
                             ->latest()
                             ->take(5)
                             ->get();
@@ -83,7 +97,7 @@ Route::middleware('auth')->group(function () {
     // ----------------------------------------------------------------------
     // Master Data (Khusus Admin)
     // ----------------------------------------------------------------------
-    Route::prefix('master')->name('master.')->group(function () {
+    Route::prefix('master')->name('master.')->middleware('admin')->group(function () {
         Route::resource('unit-kerja', UnitKerjaController::class)->except(['create', 'show', 'edit']);
         Route::resource('master-laporan', MasterLaporanController::class)->except(['create', 'show', 'edit']);
         Route::resource('users', UserController::class)->except(['create', 'show', 'edit']);

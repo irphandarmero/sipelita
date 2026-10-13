@@ -45,7 +45,7 @@
                                     class="form-select @error('master_laporan_id') is-invalid @enderror" required>
                                 <option value="">-- Pilih Kategori Laporan --</option>
                                 @foreach($masterLaporanList as $kategori)
-                                    <option value="{{ $kategori->id }}" {{ old('master_laporan_id') == $kategori->id ? 'selected' : '' }}>
+                                    <option value="{{ $kategori->id }}" data-jenis="{{ $kategori->jenis_laporan }}" {{ old('master_laporan_id') == $kategori->id ? 'selected' : '' }}>
                                         [{{ $kategori->jenis_laporan }}] {{ $kategori->nama_laporan }}
                                     </option>
                                 @endforeach
@@ -54,6 +54,12 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                             <!-- <small class="text-muted d-block mt-1">Pilih kategori yang paling menggambarkan jenis laporan.</small> -->
+                        </div>
+
+                        <div class="col-12" id="incidentil-guidance" hidden>
+                            <div class="alert alert-info mb-0">
+                                Untuk laporan Insidentil, jelaskan kronologi, lokasi, dampak kejadian, dan tindakan awal yang sudah dilakukan.
+                            </div>
                         </div>
 
                         <!-- 3. UNIT TUJUAN PENANGGUNG JAWAB (Konek ke Model UnitKerja) -->
@@ -138,23 +144,23 @@
                             <label for="lampiran" class="form-label fw-bold small text-dark">
                                 Lampiran Bukti / Foto Kerusakan <small class="text-muted fw-normal">(Opsional)</small>
                             </label>
-                            <input type="file" name="lampiran" id="lampiran" 
-                                   class="form-control @error('lampiran') is-invalid @enderror" 
-                                   accept="image/*,.pdf,.doc,.docx">
-                            @error('lampiran')
+                            <input type="file" name="lampiran_file" id="lampiran"
+                                   class="form-control @error('lampiran_file') is-invalid @enderror"
+                                   accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+                            @error('lampiran_file')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
-                            <small class="text-muted d-block mt-1">Format: JPG, PNG, PDF (Maks. 2MB).</small>
+                            <small class="text-muted d-block mt-1">Format: JPG atau PNG (Maks. 2MB).</small>
                         </div>
 
                         <!-- 9. TINDAKAN AWAL SEBELUMNYA -->
-                        <div class="col-12">
+                        <div class="col-12" id="tindakan-awal-field" hidden>
                             <label for="tindakan_awal" class="form-label fw-bold small text-dark">
-                                Tindakan Awal Yang Sudah Dilakukan <small class="text-muted fw-normal">(Opsional)</small>
+                                Tindakan Awal Yang Sudah Dilakukan <span class="text-danger">*</span>
                             </label>
                             <textarea name="tindakan_awal" id="tindakan_awal" rows="2" 
                                       class="form-control @error('tindakan_awal') is-invalid @enderror" 
-                                      placeholder="Contoh: Sudah dicoba restart PC dan mengecek sambungan kabel power...">{{ old('tindakan_awal') }}</textarea>
+                                      placeholder="Jelaskan tindakan yang telah dilakukan sebelum laporan dikirim...">{{ old('tindakan_awal') }}</textarea>
                             @error('tindakan_awal')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -174,4 +180,26 @@
         </div>
     </div>
 </div>
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const kategoriSelect = document.getElementById('master_laporan_id');
+        const tindakanAwalField = document.getElementById('tindakan-awal-field');
+        const tindakanAwalInput = document.getElementById('tindakan_awal');
+        const incidentilGuidance = document.getElementById('incidentil-guidance');
+
+        function updateIncidentilFields() {
+            const selectedOption = kategoriSelect.options[kategoriSelect.selectedIndex];
+            const isIncidentil = selectedOption && selectedOption.dataset.jenis === 'Insidentil';
+
+            tindakanAwalField.hidden = !isIncidentil;
+            incidentilGuidance.hidden = !isIncidentil;
+            tindakanAwalInput.required = Boolean(isIncidentil);
+        }
+
+        kategoriSelect.addEventListener('change', updateIncidentilFields);
+        updateIncidentilFields();
+    });
+</script>
+@endpush
 @endsection

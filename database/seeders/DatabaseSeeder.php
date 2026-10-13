@@ -78,6 +78,20 @@ class DatabaseSeeder extends Seeder
             'unit_kerja_id' => $unitSIMRS->id,
             'role' => 'admin',
         ]);
+        $userIGD = User::create([
+            'name' => 'User IGD',
+            'email' => 'userigd@sipelita.com',
+            'password' => Hash::make('password123'),
+            'unit_kerja_id' => $unitIGD->id,
+            'role' => 'petugas',
+        ]);
+        $kepalaIGD = User::create([
+            'name' => 'Kepala IGD',
+            'email' => 'karuigd@sipelita.com',
+            'password' => Hash::make('password123'),
+            'unit_kerja_id' => $unitIGD->id,
+            'role' => 'kepala_unit',
+        ]);
 
         // seed master laporan
         // master laporan

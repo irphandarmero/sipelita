@@ -58,6 +58,8 @@
                                     <span class="badge bg-danger">Administrator</span>
                                 @elseif($user->role == 'kepala_unit')
                                     <span class="badge bg-primary">Kepala Unit</span>
+                                @elseif($user->role == 'direksi')
+                                    <span class="badge bg-dark">Direksi</span>
                                 @else
                                     <span class="badge bg-info text-dark">Petugas / Staf</span>
                                 @endif
@@ -111,6 +113,7 @@
                                                 <select name="role" class="form-select" required>
                                                     <option value="petugas" {{ $user->role == 'petugas' ? 'selected' : '' }}>Petugas / Staf Penangan</option>
                                                     <option value="kepala_unit" {{ $user->role == 'kepala_unit' ? 'selected' : '' }}>Kepala Unit / Pelapor</option>
+                                                    <option value="direksi" {{ $user->role == 'direksi' ? 'selected' : '' }}>Direksi</option>
                                                     <option value="admin" {{ $user->role == 'admin' ? 'selected' : '' }}>Administrator Sistem</option>
                                                 </select>
                                             </div>
@@ -171,6 +174,7 @@
                         <select name="role" class="form-select" required>
                             <option value="petugas">Petugas / Staf Penangan</option>
                             <option value="kepala_unit">Kepala Unit / Pelapor</option>
+                            <option value="direksi">Direksi</option>
                             <option value="admin">Administrator Sistem</option>
                         </select>
                     </div>

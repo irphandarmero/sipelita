@@ -19,16 +19,18 @@
             <a href="{{ route('laporan.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Kembali</a>
             
             <!-- Tombol Disposisi khusus Unit Tujuan / Admin / Petugas -->
-            @if(Auth::user()->unit_kerja_id == $laporan->unit_tujuan_id || Auth::user()->role == 'admin' || Auth::user()->id == $laporan->petugas_penangan_id)
+            @if($canCreateDisposisi)
                 <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalKirimDisposisi">
                     <i class="bi bi-send-plus me-1"></i> Kirim Disposisi
                 </button>
             @endif
 
             <!-- Tombol Update Status Utama -->
-            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalUpdateStatus">
-                <i class="bi bi-pencil-square me-1"></i> Update Status
-            </button>
+            @if($canManageStatus)
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalUpdateStatus">
+                    <i class="bi bi-pencil-square me-1"></i> Update Status
+                </button>
+            @endif
         </div>
     </div>
 
@@ -97,7 +99,7 @@
                         <p class="text-secondary bg-white p-3 rounded border mb-0">{{ $laporan->deskripsi_kejadian }}</p>
                     </div>
 
-                    @if($laporan->tindakan_awal)
+                    @if($isIncidentil && $laporan->tindakan_awal)
                         <div class="mb-4">
                             <h6 class="fw-bold text-dark small mb-2">Tindakan Awal yang Sudah Dilakukan:</h6>
                             <p class="text-secondary bg-white p-3 rounded border mb-0">{{ $laporan->tindakan_awal }}</p>
@@ -109,21 +111,24 @@
                             <h6 class="fw-bold mb-2"><i class="bi bi-paperclip me-1"></i>Lampiran Berkas Laporan:</h6>
                             @php
                                 $extension = strtolower(pathinfo($laporan->lampiran_file, PATHINFO_EXTENSION));
+                                $previewType = in_array($extension, ['jpg', 'jpeg', 'png']) ? 'image' : 'pdf';
+                                $lampiranUrl = asset('storage/' . $laporan->lampiran_file);
                             @endphp
-                            @if(in_array($extension, ['jpg', 'jpeg', 'png']))
-                                <a href="{{ asset('storage/' . $laporan->lampiran_file) }}" target="_blank">
-                                    <img src="{{ asset('storage/' . $laporan->lampiran_file) }}" alt="Lampiran" class="img-fluid rounded border shadow-sm" style="max-height: 250px;">
-                                </a>
+                            @if($previewType === 'image')
+                                <button type="button" class="btn p-0 border-0 bg-transparent" data-bs-toggle="modal" data-bs-target="#modalPreviewLampiran" data-preview-url="{{ $lampiranUrl }}" data-preview-type="{{ $previewType }}" data-preview-title="Lampiran Berkas Laporan">
+                                    <img src="{{ $lampiranUrl }}" alt="Pratinjau lampiran laporan" class="img-fluid rounded border shadow-sm" style="max-height: 250px;">
+                                </button>
                             @else
-                                <a href="{{ asset('storage/' . $laporan->lampiran_file) }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-file-earmark-pdf-fill me-1 text-danger"></i> Buka Lampiran Dokumen
-                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalPreviewLampiran" data-preview-url="{{ $lampiranUrl }}" data-preview-type="{{ $previewType }}" data-preview-title="Lampiran Berkas Laporan">
+                                    <i class="bi bi-file-earmark-pdf-fill me-1 text-danger"></i> Lihat Lampiran Dokumen
+                                </button>
                             @endif
                         </div>
                     @endif
                 </div>
             </div>
 
+            @if($isIncidentil)
             <!-- LEMBAR DISPOSISI LINTAS UNIT -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
@@ -131,7 +136,7 @@
                         <i class="bi bi-signpost-split-fill me-2 text-warning"></i>Lembar Disposisi & Sub-Tugas Pendukung
                         <span class="badge bg-secondary rounded-pill ms-1">{{ $laporan->disposisiLaporan->count() }}</span>
                     </h6>
-                    @if(Auth::user()->unit_kerja_id == $laporan->unit_tujuan_id || Auth::user()->role == 'admin')
+                    @if($canManageStatus)
                         <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalKirimDisposisi">
                             <i class="bi bi-plus-lg me-1"></i> Disposisi Baru
                         </button>
@@ -181,14 +186,26 @@
                                         <div class="d-flex justify-content-between align-items-center pt-2 border-top mt-2">
                                             <small class="text-muted" style="font-size: 0.725rem;">
                                                 <i class="bi bi-clock me-1"></i>{{ \Carbon\Carbon::parse($disposisi->tanggal_disposisi)->format('d M Y, H:i') }}
-                                                @if($disposisi->petugasDisposisi)
-                                                     • Oleh: {{ $disposisi->petugasDisposisi->name }}
+                                                @if($disposisi->userPengirim)
+                                                     • Dikirim oleh: {{ $disposisi->userPengirim->name }}
+                                                @endif
+                                                @if($disposisi->petugasTindakLanjut)
+                                                     • Ditindaklanjuti oleh: {{ $disposisi->petugasTindakLanjut->name }}
                                                 @endif
                                             </small>
+                                            @if($disposisi->lampiran_disposisi)
+                                                @php
+                                                    $disposisiExtension = strtolower(pathinfo($disposisi->lampiran_disposisi, PATHINFO_EXTENSION));
+                                                    $disposisiPreviewType = in_array($disposisiExtension, ['jpg', 'jpeg', 'png']) ? 'image' : 'pdf';
+                                                @endphp
+                                                <button type="button" class="btn btn-link btn-sm p-0 small" data-bs-toggle="modal" data-bs-target="#modalPreviewLampiran" data-preview-url="{{ asset('storage/' . $disposisi->lampiran_disposisi) }}" data-preview-type="{{ $disposisiPreviewType }}" data-preview-title="Lampiran Tindak Lanjut Disposisi">
+                                                    Lihat lampiran tindak lanjut
+                                                </button>
+                                            @endif
 
                                             <div class="d-flex gap-1">
                                                 <!-- Tombol Update Disposisi bagi Unit Penerima -->
-                                                @if(Auth::user()->unit_kerja_id == $disposisi->unit_penerima_id || Auth::user()->role == 'admin')
+                                                @if(Auth::user()->unit_kerja_id == $disposisi->unit_penerima_id)
                                                     <button type="button" class="btn btn-xs btn-outline-primary btn-update-disposisi" 
                                                             data-bs-toggle="modal" 
                                                             data-bs-target="#modalUpdateDisposisi"
@@ -200,7 +217,7 @@
                                                 @endif
 
                                                 <!-- Batal Disposisi oleh Unit Pengirim -->
-                                                @if(Auth::user()->unit_kerja_id == $disposisi->unit_pengirim_id && $disposisi->status_disposisi === 'Pending')
+                                                @if($disposisi->status_disposisi === 'Pending' && (Auth::user()->role == 'admin' || Auth::user()->unit_kerja_id == $disposisi->unit_pengirim_id))
                                                     <form action="{{ route('disposisi.destroy', $disposisi->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan disposisi ini?')">
                                                         @csrf
                                                         @method('DELETE')
@@ -218,6 +235,7 @@
                     @endif
                 </div>
             </div>
+            @endif
         </div>
 
         <!-- Timeline Audit Trail -->
@@ -246,6 +264,23 @@
     </div>
 </div>
 
+<!-- MODAL PRATINJAU LAMPIRAN -->
+<div class="modal fade" id="modalPreviewLampiran" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header">
+                <h5 class="modal-title fs-6 fw-bold" id="modalPreviewLampiranTitle">Pratinjau Lampiran</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body text-center bg-light p-2">
+                <img id="previewLampiranImage" class="img-fluid d-none mx-auto" alt="Pratinjau lampiran">
+                <iframe id="previewLampiranPdf" class="w-100 d-none border-0 bg-white" style="height: 75vh;" title="Pratinjau dokumen PDF"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if($isIncidentil)
 <!-- MODAL 1: KIRIM DISPOSISI BARU -->
 <div class="modal fade" id="modalKirimDisposisi" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
@@ -295,7 +330,7 @@
                     <div class="mb-3">
                         <label for="disp_status" class="form-label fw-semibold small">Status Disposisi Unit <span class="text-danger">*</span></label>
                         <select class="form-select" id="disp_status" name="status_disposisi" required>
-                            <option value="Menunggu">Menunggu</option>
+                            <option value="Pending">Menunggu</option>
                             <option value="Diproses">Diproses</option>
                             <option value="Selesai">Selesai</option>
                             <option value="Ditolak">Ditolak</option>
@@ -307,7 +342,7 @@
                     </div>
                     <div class="mb-3">
                         <label for="disp_file" class="form-label fw-semibold small">Unggah Bukti Pengerjaan (Gambar / PDF)</label>
-                        <input type="file" class="form-control" id="disp_file" name="lampiran_file" accept="image/*,.pdf">
+                        <input type="file" class="form-control" id="disp_file" name="lampiran_disposisi" accept="image/*,.pdf">
                     </div>
                 </div>
                 <div class="modal-footer bg-light">
@@ -318,6 +353,7 @@
         </div>
     </div>
 </div>
+@endif
 
 <!-- MODAL 3: UPDATE STATUS UTAMA LAPORAN -->
 <div class="modal fade" id="modalUpdateStatus" tabindex="-1" aria-hidden="true">
@@ -357,6 +393,32 @@
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const previewModal = document.getElementById('modalPreviewLampiran');
+        const previewTitle = document.getElementById('modalPreviewLampiranTitle');
+        const previewImage = document.getElementById('previewLampiranImage');
+        const previewPdf = document.getElementById('previewLampiranPdf');
+
+        previewModal.addEventListener('show.bs.modal', function (event) {
+            const trigger = event.relatedTarget;
+            const previewUrl = trigger.getAttribute('data-preview-url');
+            const previewType = trigger.getAttribute('data-preview-type');
+
+            previewTitle.textContent = trigger.getAttribute('data-preview-title');
+            previewImage.classList.toggle('d-none', previewType !== 'image');
+            previewPdf.classList.toggle('d-none', previewType !== 'pdf');
+
+            if (previewType === 'image') {
+                previewImage.src = previewUrl;
+            } else {
+                previewPdf.src = previewUrl;
+            }
+        });
+
+        previewModal.addEventListener('hidden.bs.modal', function () {
+            previewImage.removeAttribute('src');
+            previewPdf.removeAttribute('src');
+        });
+
         const updateButtons = document.querySelectorAll('.btn-update-disposisi');
         const formUpdate = document.getElementById('formUpdateDisposisi');
         const selectStatus = document.getElementById('disp_status');

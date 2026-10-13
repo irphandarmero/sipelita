@@ -8,6 +8,7 @@ use App\Models\DetailLaporan;
 use App\Models\DisposisiLaporan;
 use App\Models\RiwayatLaporan;
 use App\Models\UnitKerja;
+use Illuminate\Support\Facades\DB;
 
 class DisposisiLaporanController extends Controller
 {
@@ -24,10 +25,13 @@ class DisposisiLaporanController extends Controller
             'catatan_disposisi.required' => 'Catatan instruksi disposisi wajib diisi.',
         ]);
 
-        $laporan = DetailLaporan::findOrFail($laporanId);
+        $laporan = DetailLaporan::with('masterLaporan')->findOrFail($laporanId);
+        if (!$laporan->masterLaporan || $laporan->masterLaporan->jenis_laporan !== 'Insidentil') {
+            return redirect()->back()->with('error', 'Disposisi hanya tersedia untuk laporan Insidentil.');
+        }
+        $user = Auth::user();
 
-       // 1. Otorisasi Hak Akses: Hanya Unit Penanggung Jawab / Tujuan atau Admin yang dapat membuat disposisi
-        if (Auth::user()->role !== 'admin' && Auth::user()->unit_kerja_id != $laporan->unit_tujuan_id) {
+        if ($user->role !== 'admin' && $user->unit_kerja_id != $laporan->unit_tujuan_id && $user->id != $laporan->petugas_penangan_id) {
             return redirect()->back()->with('error', 'Hanya Unit Penanggung Jawab Laporan atau Admin yang berhak memberikan disposisi.');
         }
 
@@ -37,7 +41,7 @@ class DisposisiLaporanController extends Controller
         }
 
         // 3. Mencegah disposisi ke unit kerja sendiri
-        if ($request->unit_penerima_id == Auth::user()->unit_kerja_id) {
+        if ($request->unit_penerima_id == $laporan->unit_tujuan_id) {
             return redirect()->back()->with('error', 'Disposisi tidak dapat dikirimkan ke unit kerja Anda sendiri.');
         }
 
@@ -51,36 +55,45 @@ class DisposisiLaporanController extends Controller
             return redirect()->back()->with('error', 'Unit tersebut masih memiliki tugas disposisi aktif yang belum diselesaikan pada laporan ini.');
         }
 
-        // Buat data Disposisi Laporan
-        $disposisi = DisposisiLaporan::create([
-            'detail_laporan_id' => $laporan->id,
-            'unit_pengirim_id'  => Auth::user()->unit_kerja_id,
-            'petugas_disposisi_id'  => Auth::id(),
-            'unit_penerima_id'  => $request->unit_penerima_id,
-            'catatan_disposisi' => $request->catatan_disposisi,
-            'status_disposisi'  => 'Pending',
-            'tanggal_disposisi' => now(),
-        ]);
+        $unitPenerima = UnitKerja::findOrFail($request->unit_penerima_id);
 
-        $unitPenerima = UnitKerja::find($request->unit_penerima_id);
-
-        // Jika status laporan utama masih Diajukan, otomatis ubah menjadi Diproses
-        if ($laporan->status_laporan === 'Diajukan') {
-            $laporan->status_laporan = 'Diproses';
-            if (!$laporan->petugas_penangan_id) {
-                $laporan->petugas_penangan_id = Auth::id();
+        DB::transaction(function () use ($laporan, $request, $unitPenerima) {
+            $laporan = DetailLaporan::whereKey($laporan->id)->lockForUpdate()->firstOrFail();
+            if ($laporan->status_laporan === 'Selesai' || $laporan->status_laporan === 'Ditolak') {
+                return redirect()->back()->with('error', "Disposisi tidak dapat dikirimkan pada laporan berstatus '{$laporan->status_laporan}'.");
             }
-            $laporan->save();
-        }
+            if ($laporan->disposisiLaporan()
+                ->where('unit_penerima_id', $request->unit_penerima_id)
+                ->whereIn('status_disposisi', ['Pending', 'Diproses'])
+                ->exists()) {
+                return redirect()->back()->with('error', 'Unit tersebut masih memiliki tugas disposisi aktif yang belum diselesaikan pada laporan ini.');
+            }
 
-        // Pencatatan Log ke Audit Trail / Riwayat Laporan
-        RiwayatLaporan::create([
-            'detail_laporan_id' => $laporan->id,
-            'user_id'           => Auth::id(),
-            'status_sebelumnya' => $laporan->status_laporan,
-            'status_baru'       => $laporan->status_laporan,
-            'keterangan'        => "Disposisi dikirim ke unit [{$unitPenerima->nama_unit}]: {$request->catatan_disposisi}",
-        ]);
+            $statusSebelumnya = $laporan->status_laporan;
+            DisposisiLaporan::create([
+                'detail_laporan_id' => $laporan->id,
+                'unit_pengirim_id'  => $laporan->unit_tujuan_id,
+                'petugas_disposisi_id' => Auth::id(),
+                'unit_penerima_id'  => $request->unit_penerima_id,
+                'catatan_disposisi' => $request->catatan_disposisi,
+                'status_disposisi'  => 'Pending',
+                'tanggal_disposisi' => now(),
+            ]);
+
+            if ($laporan->status_laporan === 'Diajukan') {
+                $laporan->status_laporan = 'Diproses';
+                $laporan->petugas_penangan_id = $laporan->petugas_penangan_id ?: Auth::id();
+                $laporan->save();
+            }
+
+            RiwayatLaporan::create([
+                'detail_laporan_id' => $laporan->id,
+                'user_id'           => Auth::id(),
+                'status_sebelumnya' => $statusSebelumnya,
+                'status_baru'       => $laporan->status_laporan,
+                'keterangan'        => "Disposisi dikirim ke unit [{$unitPenerima->nama_unit}]: {$request->catatan_disposisi}",
+            ]);
+        });
 
         return redirect()->back()
             ->with('success', "Disposisi laporan berhasil dikirimkan ke unit {$unitPenerima->nama_unit}.");
@@ -94,38 +107,54 @@ class DisposisiLaporanController extends Controller
         $request->validate([
             'status_disposisi'      => ['required', 'in:Pending,Diproses,Selesai,Ditolak'],
             'catatan_tindak_lanjut' => ['required', 'string', 'max:1000'],
-            'lampiran_file'         => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5048'],
+            'lampiran_disposisi'    => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
         ], [
             'status_disposisi.required'      => 'Status disposisi wajib ditentukan.',
             'catatan_tindak_lanjut.required' => 'Catatan tindak lanjut wajib diisi.',
-            'lampiran_file.max'              => 'Ukuran berkas lampiran maksimal 5MB.',
+            'lampiran_disposisi.max'          => 'Ukuran berkas lampiran maksimal 5MB.',
         ]);
 
-        $disposisi = DisposisiLaporan::with(['detailLaporan', 'unitPenerima'])->findOrFail($id);
-
-        // Unggah berkas bukti pengerjaan disposisi jika ada
-        if ($request->hasFile('lampiran_file')) {
-            $disposisi->lampiran_file = $request->file('lampiran_file')->store('lampiran_disposisi', 'public');
+        $disposisi = DisposisiLaporan::with(['detailLaporan.masterLaporan', 'unitPenerima'])->findOrFail($id);
+        if (!$disposisi->detailLaporan->masterLaporan
+            || $disposisi->detailLaporan->masterLaporan->jenis_laporan !== 'Insidentil') {
+            return redirect()->back()->with('error', 'Disposisi hanya tersedia untuk laporan Insidentil.');
+        }
+        if (Auth::user()->unit_kerja_id != $disposisi->unit_penerima_id) {
+            abort(403);
         }
 
-        $disposisi->status_disposisi      = $request->status_disposisi;
-        $disposisi->catatan_tindak_lanjut = $request->catatan_tindak_lanjut;
-        $disposisi->petugas_disposisi_id      = Auth::id();
-
-        if ($request->status_disposisi === 'Selesai') {
-            $disposisi->tanggal_selesai = now();
+        $lampiranPath = null;
+        if ($request->hasFile('lampiran_disposisi')) {
+            $lampiranPath = $request->file('lampiran_disposisi')->store('lampiran_disposisi', 'public');
+            if ($lampiranPath === false) {
+                throw new \RuntimeException('Gagal menyimpan lampiran tindak lanjut disposisi.');
+            }
         }
 
-        $disposisi->save();
+        DB::transaction(function () use ($disposisi, $request, $lampiranPath) {
+            $statusLaporan = $disposisi->detailLaporan->status_laporan;
+            $disposisi->status_disposisi = $request->status_disposisi;
+            $disposisi->catatan_tindak_lanjut = $request->catatan_tindak_lanjut;
+            $disposisi->petugas_tindak_lanjut_id = Auth::id();
 
-        // Pencatatan Log Audit Trail
-        RiwayatLaporan::create([
-            'detail_laporan_id' => $disposisi->detail_laporan_id,
-            'user_id'           => Auth::id(),
-            'status_sebelumnya' => $disposisi->detailLaporan->status_laporan,
-            'status_baru'       => $disposisi->detailLaporan->status_laporan,
-            'keterangan'        => "Disposisi [Unit {$disposisi->unitPenerima->nama_unit}] diperbarui menjadi '{$request->status_disposisi}': {$request->catatan_tindak_lanjut}",
-        ]);
+            if ($lampiranPath) {
+                $disposisi->lampiran_disposisi = $lampiranPath;
+            }
+
+            if ($request->status_disposisi !== 'Pending' && !$disposisi->tanggal_diterima) {
+                $disposisi->tanggal_diterima = now();
+            }
+            $disposisi->tanggal_selesai = $request->status_disposisi === 'Selesai' ? now() : null;
+            $disposisi->save();
+
+            RiwayatLaporan::create([
+                'detail_laporan_id' => $disposisi->detail_laporan_id,
+                'user_id'           => Auth::id(),
+                'status_sebelumnya' => $statusLaporan,
+                'status_baru'       => $statusLaporan,
+                'keterangan'        => "Disposisi [Unit {$disposisi->unitPenerima->nama_unit}] diperbarui menjadi '{$request->status_disposisi}': {$request->catatan_tindak_lanjut}",
+            ]);
+        });
 
         return redirect()->back()
             ->with('success', "Status disposisi unit {$disposisi->unitPenerima->nama_unit} berhasil diperbarui.");
@@ -136,26 +165,35 @@ class DisposisiLaporanController extends Controller
      */
     public function destroy($id)
     {
-        $disposisi = DisposisiLaporan::with('unitPenerima')->findOrFail($id);
+        $disposisi = DisposisiLaporan::with(['detailLaporan.masterLaporan', 'unitPenerima'])->findOrFail($id);
+        if (!$disposisi->detailLaporan->masterLaporan
+            || $disposisi->detailLaporan->masterLaporan->jenis_laporan !== 'Insidentil') {
+            return redirect()->back()->with('error', 'Disposisi hanya tersedia untuk laporan Insidentil.');
+        }
+        if (Auth::user()->role !== 'admin' && Auth::user()->unit_kerja_id != $disposisi->unit_pengirim_id) {
+            abort(403);
+        }
 
         $laporanId = $disposisi->detail_laporan_id;
         $unitNama  = $disposisi->unitPenerima->nama_unit ?? 'Tujuan';
 
         // Hanya bisa dihapus jika statusnya masih Menunggu
-        if ($disposisi->status_disposisi !== 'pending') {
+        if ($disposisi->status_disposisi !== 'Pending') {
             return redirect()->back()->with('error', 'Disposisi yang sudah diproses/selesai tidak dapat dibatalkan.');
         }
 
-        $disposisi->delete();
+        DB::transaction(function () use ($disposisi, $laporanId, $unitNama) {
+            $status = $disposisi->detailLaporan->status_laporan;
+            $disposisi->delete();
 
-        // Log Audit Trail
-        RiwayatLaporan::create([
-            'detail_laporan_id' => $laporanId,
-            'user_id'           => Auth::id(),
-            'status_sebelumnya' => null,
-            'status_baru'       => null,
-            'keterangan'        => "Disposisi ke unit [{$unitNama}] telah dibatalkan.",
-        ]);
+            RiwayatLaporan::create([
+                'detail_laporan_id' => $laporanId,
+                'user_id'           => Auth::id(),
+                'status_sebelumnya' => $status,
+                'status_baru'       => $status,
+                'keterangan'        => "Disposisi ke unit [{$unitNama}] telah dibatalkan.",
+            ]);
+        });
 
         return redirect()->back()->with('success', 'Disposisi berhasil dibatalkan/dihapus.');
     }

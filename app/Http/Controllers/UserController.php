@@ -23,7 +23,7 @@ class UserController extends Controller
             'email'         => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password'      => ['required', 'string', 'min:6'],
             'unit_kerja_id' => ['required', 'exists:unit_kerja,id'],
-            'role'          => ['required', 'in:admin,petugas,kepala_unit'],
+            'role'          => ['required', 'in:admin,petugas,kepala_unit,direksi'],
         ], [
             'name.required'          => 'Nama lengkap wajib diisi.',
             'email.required'         => 'Alamat email wajib diisi.',
@@ -52,7 +52,7 @@ class UserController extends Controller
             'name'          => ['required', 'string', 'max:255'],
             'email'         => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $id],
             'unit_kerja_id' => ['required', 'exists:unit_kerja,id'],
-            'role'          => ['required', 'in:admin,petugas,kepala_unit'],
+            'role'          => ['required', 'in:admin,petugas,kepala_unit,direksi'],
             'password'      => ['nullable', 'string', 'min:6'],
         ]);
 

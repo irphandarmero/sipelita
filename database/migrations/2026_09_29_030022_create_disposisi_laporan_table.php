@@ -18,7 +18,7 @@ class CreateDisposisiLaporanTable extends Migration
             $table->foreignId('detail_laporan_id')->constrained('detail_laporan')->cascadeOnDelete();
             $table->foreignId('unit_pengirim_id')->constrained('unit_kerja')->cascadeOnDelete();
             $table->foreignId('unit_penerima_id')->constrained('unit_kerja')->cascadeOnDelete();
-            $table->foreignId('petugas_disposisi_id')->constrained('users')->setNullOnDelete();
+            $table->foreignId('petugas_disposisi_id')->nullable()->constrained('users')->nullOnDelete();
             $table->text('catatan_disposisi')->nullable();
             $table->text('catatan_tindak_lanjut')->nullable();
             $table->enum('status_disposisi', ['Pending', 'Diproses', 'Selesai', 'Ditolak'])->default('Pending');

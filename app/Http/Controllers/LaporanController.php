@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use App\Models\DetailLaporan;
 use App\Models\MasterLaporan;
@@ -23,13 +25,23 @@ class LaporanController extends Controller
         // Filter berdasarkan jenis tampilan (Laporan Masuk Unit vs Laporan Saya)
         if ($request->get('view_type') === 'incoming') {
             $userUnitId = Auth::user()->unit_kerja_id;
-            $query->where('unit_tujuan_id', $userUnitId);
+            $query->where(function ($scope) use ($userUnitId) {
+                $scope->where('unit_tujuan_id', $userUnitId)
+                    ->orWhereHas('disposisiLaporan', function ($disposisiQuery) use ($userUnitId) {
+                        $disposisiQuery->where('unit_penerima_id', $userUnitId);
+                    });
+            });
         } else {
             // Jika memilih view laporan saya / default
-            if (in_array(Auth::user()->role, ['petugas', 'kepala_unit'])) {
+            if (!in_array(Auth::user()->role, ['admin', 'direksi'])) {
                 $query->where(function ($q) {
                     $q->where('user_id', Auth::id())
-                      ->orWhere('unit_asal_id', Auth::user()->unit_kerja_id);
+                      ->orWhere('unit_asal_id', Auth::user()->unit_kerja_id)
+                      ->orWhere('unit_tujuan_id', Auth::user()->unit_kerja_id)
+                      ->orWhereHas('disposisiLaporan', function ($disposisiQuery) {
+                          $disposisiQuery->where('unit_pengirim_id', Auth::user()->unit_kerja_id)
+                              ->orWhere('unit_penerima_id', Auth::user()->unit_kerja_id);
+                      });
                 });
             }
         }
@@ -84,6 +96,8 @@ class LaporanController extends Controller
      */
     public function create()
     {
+        abort_unless(Auth::user()->unit_kerja_id, 403, 'Akun Anda belum terhubung ke unit kerja.');
+
         $masterLaporanList = MasterLaporan::where('status_aktif', true)->get();
         $unitKerjaList = UnitKerja::where('id', '!=', Auth::user()->unit_kerja_id)->get();
 
@@ -95,25 +109,39 @@ class LaporanController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'master_laporan_id'  => ['required', 'exists:master_laporan,id'],
-            'unit_tujuan_id'     => ['required', 'exists:unit_kerja,id'],
-            'judul_laporan'      => ['required', 'string', 'max:255'],
+        abort_unless(Auth::user()->unit_kerja_id, 403, 'Akun Anda belum terhubung ke unit kerja.');
+
+        $validated = $request->validate([
+            'master_laporan_id'  => ['required', Rule::exists('master_laporan', 'id')->where('status_aktif', true)],
+        ]);
+
+        $masterLaporan = MasterLaporan::where('status_aktif', true)->findOrFail($validated['master_laporan_id']);
+
+        $validated = array_merge($validated, $request->validate([
+            'unit_tujuan_id'     => ['required', 'exists:unit_kerja,id', Rule::notIn([Auth::user()->unit_kerja_id])],
+            'tanggal_kejadian'   => ['required', 'date_format:Y-m-d\TH:i'],
+            'judul_laporan'      => ['required', 'string', 'max:200'],
             'deskripsi_kejadian' => ['required', 'string'],
             'prioritas'          => ['required', 'in:Rendah,Sedang,Tinggi,Darurat'],
-            'tindakan_awal'      => ['nullable', 'string'],
-            'foto_lampiran'      => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'tindakan_awal'      => [
+                Rule::requiredIf($masterLaporan->jenis_laporan === 'Insidentil'),
+                'nullable',
+                'string',
+                'max:2000',
+            ],
+            'lampiran_file'      => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
         ], [
             'master_laporan_id.required'  => 'Kategori laporan wajib dipilih.',
             'unit_tujuan_id.required'     => 'Unit tujuan laporan wajib dipilih.',
+            'unit_tujuan_id.not_in'       => 'Unit tujuan harus berbeda dengan unit asal.',
+            'tanggal_kejadian.required'   => 'Tanggal dan waktu kejadian wajib diisi.',
             'judul_laporan.required'      => 'Judul laporan wajib diisi.',
             'deskripsi_kejadian.required' => 'Rincian deskripsi laporan wajib diisi.',
             'prioritas.required'          => 'Tingkat prioritas wajib dipilih.',
-            'foto_lampiran.image'         => 'Berkas lampiran harus berupa gambar (JPG/PNG).',
-            'foto_lampiran.max'           => 'Ukuran foto lampiran maksimal 2MB.',
-        ]);
-
-        $masterLaporan = MasterLaporan::findOrFail($request->master_laporan_id);
+            'tindakan_awal.required'      => 'Tindakan awal wajib dijelaskan untuk laporan Insidentil.',
+            'lampiran_file.image'         => 'Berkas lampiran harus berupa gambar (JPG/PNG).',
+            'lampiran_file.max'           => 'Ukuran foto lampiran maksimal 2MB.',
+        ]));
 
         // Generate Kode Transaksi Otomatis (Contoh: RUT-20260928-001 / INC-20260928-001)
         $prefix = ($masterLaporan->jenis_laporan === 'Rutin') ? 'RUT' : 'INC';
@@ -122,35 +150,40 @@ class LaporanController extends Controller
         $kodeTransaksi = "{$prefix}-{$todayDate}-{$randomSequence}";
 
         // Upload Foto Lampiran jika ada
-        $fotoPath = null;
-        if ($request->hasFile('foto_lampiran')) {
-            $fotoPath = $request->file('foto_lampiran')->store('lampiran_laporan', 'public');
+        $lampiranPath = null;
+        if ($request->hasFile('lampiran_file')) {
+            $lampiranPath = $request->file('lampiran_file')->store('lampiran_laporan', 'public');
+            if ($lampiranPath === false) {
+                throw new \RuntimeException('Gagal menyimpan lampiran laporan.');
+            }
         }
 
-        // Simpan Detail Laporan
-        $laporan = DetailLaporan::create([
-            'kode_transaksi'     => $kodeTransaksi,
-            'user_id'            => Auth::id(),
-            'unit_asal_id'       => Auth::user()->unit_kerja_id,
-            'unit_tujuan_id'     => $request->unit_tujuan_id,
-            'master_laporan_id'  => $request->master_laporan_id,
-            'tanggal_kejadian'   => now(),
-            'judul_laporan'      => $request->judul_laporan,
-            'deskripsi_kejadian' => $request->deskripsi_kejadian,
-            'tindakan_awal'      => $request->tindakan_awal,
-            'prioritas'          => $request->prioritas,
-            'status_laporan'     => 'Diajukan',
-            'foto_lampiran'      => $fotoPath,
-        ]);
+        DB::transaction(function () use ($validated, $kodeTransaksi, $lampiranPath, $masterLaporan) {
+            $laporan = DetailLaporan::create([
+                'kode_transaksi'     => $kodeTransaksi,
+                'user_id'            => Auth::id(),
+                'unit_asal_id'       => Auth::user()->unit_kerja_id,
+                'unit_tujuan_id'     => $validated['unit_tujuan_id'],
+                'master_laporan_id'  => $validated['master_laporan_id'],
+                'tanggal_kejadian'   => $validated['tanggal_kejadian'],
+                'judul_laporan'      => $validated['judul_laporan'],
+                'deskripsi_kejadian' => $validated['deskripsi_kejadian'],
+                'tindakan_awal'      => $masterLaporan->jenis_laporan === 'Insidentil'
+                    ? ($validated['tindakan_awal'] ?? null)
+                    : null,
+                'prioritas'          => $validated['prioritas'],
+                'status_laporan'     => 'Diajukan',
+                'lampiran_file'      => $lampiranPath,
+            ]);
 
-        // Pencatatan Audit Trail / History Awal
-        RiwayatLaporan::create([
-            'detail_laporan_id' => $laporan->id,
-            'user_id'           => Auth::id(),
-            'status_sebelumnya' => null,
-            'status_baru'       => 'Diajukan',
-            'keterangan'        => 'Laporan baru berhasil diajukan ke unit tujuan.',
-        ]);
+            RiwayatLaporan::create([
+                'detail_laporan_id' => $laporan->id,
+                'user_id'           => Auth::id(),
+                'status_sebelumnya' => null,
+                'status_baru'       => 'Diajukan',
+                'keterangan'        => 'Laporan baru berhasil diajukan ke unit tujuan.',
+            ]);
+        });
 
         return redirect()->route('laporan.index')
             ->with('success', "Laporan [{$kodeTransaksi}] berhasil dibuat dan dikirim.");
@@ -171,12 +204,27 @@ class LaporanController extends Controller
             'disposisiLaporan.unitPengirim',
             'disposisiLaporan.unitPenerima',
             'disposisiLaporan.userPengirim',
-            'disposisiLaporan.userPenerima',
+            'disposisiLaporan.petugasTindakLanjut',
         ])->findOrFail($id);
 
-        $unitKerjaList = UnitKerja::where('id', '!=', Auth::user()->unit_kerja_id)->get();
-        
-        return view('laporan.show', compact('laporan', 'unitKerjaList'));
+        $user = Auth::user();
+        $canView = in_array($user->role, ['admin', 'direksi'])
+            || $user->id === $laporan->user_id
+            || $user->id === $laporan->petugas_penangan_id
+            || in_array($user->unit_kerja_id, [$laporan->unit_asal_id, $laporan->unit_tujuan_id])
+            || $laporan->disposisiLaporan()->where(function ($query) use ($user) {
+                $query->where('unit_pengirim_id', $user->unit_kerja_id)
+                    ->orWhere('unit_penerima_id', $user->unit_kerja_id);
+            })->exists();
+        abort_unless($canView, 403);
+
+        $unitKerjaList = UnitKerja::where('id', '!=', $laporan->unit_tujuan_id)->get();
+        $canManageStatus = $user->role === 'admin' || $user->unit_kerja_id == $laporan->unit_tujuan_id;
+        $isIncidentil = $laporan->masterLaporan && $laporan->masterLaporan->jenis_laporan === 'Insidentil';
+        $canCreateDisposisi = $isIncidentil
+            && ($canManageStatus || $user->id == $laporan->petugas_penangan_id);
+
+        return view('laporan.show', compact('laporan', 'unitKerjaList', 'canManageStatus', 'canCreateDisposisi', 'isIncidentil'));
     }
 
     /**
@@ -203,43 +251,47 @@ class LaporanController extends Controller
             return redirect()->back()->with('error', "Laporan berstatus '{$laporan->status_laporan}' tidak dapat diubah statusnya.");
         }
 
-        // 3. Validasi Keterkaitan Disposisi jika Status Diubah menjadi Selesai
-        if ($request->status_baru === 'Selesai') {
-            $pendingDisposisiCount = $laporan->disposisiLaporan()
-                ->whereIn('status_disposisi', ['Menunggu', 'Diproses'])
-                ->count();
+        return DB::transaction(function () use ($id, $request) {
+            $laporan = DetailLaporan::whereKey($id)->lockForUpdate()->firstOrFail();
 
-            if ($pendingDisposisiCount > 0) {
-                return redirect()->back()->with('error', "Laporan tidak dapat diselesaikan karena masih terdapat {$pendingDisposisiCount} tugas disposisi ke unit lain yang berstatus Menunggu atau Diproses.");
+            if (Auth::user()->role !== 'admin' && Auth::user()->unit_kerja_id != $laporan->unit_tujuan_id) {
+                abort(403);
             }
-        }
-        $statusSebelumnya = $laporan->status_laporan;
 
-        // Update data laporan
-        $laporan->status_laporan = $request->status_baru;
+            if (in_array($laporan->status_laporan, ['Selesai', 'Ditolak']) && Auth::user()->role !== 'admin') {
+                return redirect()->back()->with('error', "Laporan berstatus '{$laporan->status_laporan}' tidak dapat diubah statusnya.");
+            }
 
-        // Jika status diubah menjadi Diproses dan belum ada petugas, tetapkan user login sebagai petugas
-        if ($request->status_baru === 'Diproses' && !$laporan->petugas_penangan_id) {
-            $laporan->petugas_penangan_id = Auth::id();
-        }
+            if ($request->status_baru === 'Selesai') {
+                $pendingDisposisiCount = $laporan->disposisiLaporan()
+                    ->whereIn('status_disposisi', ['Pending', 'Diproses'])
+                    ->count();
 
-        // Jika status Selesai, catat tanggal penyelesaian
-        if ($request->status_baru === 'Selesai') {
-            $laporan->tanggal_penyelesaian = now();
-        }
+                if ($pendingDisposisiCount > 0) {
+                    return redirect()->back()->with('error', "Laporan tidak dapat diselesaikan karena masih terdapat {$pendingDisposisiCount} tugas disposisi ke unit lain yang berstatus Menunggu atau Diproses.");
+                }
+            }
 
-        $laporan->save();
+            $statusSebelumnya = $laporan->status_laporan;
+            $laporan->status_laporan = $request->status_baru;
 
-        // Tambahkan Log ke Riwayat Laporan
-        RiwayatLaporan::create([
-            'detail_laporan_id' => $laporan->id,
-            'user_id'           => Auth::id(),
-            'status_sebelumnya' => $statusSebelumnya,
-            'status_baru'       => $request->status_baru,
-            'keterangan'        => $request->keterangan,
-        ]);
+            if ($request->status_baru === 'Diproses' && !$laporan->petugas_penangan_id) {
+                $laporan->petugas_penangan_id = Auth::id();
+            }
 
-        return redirect()->back()
-            ->with('success', "Status laporan {$laporan->kode_transaksi} berhasil diperbarui menjadi '{$request->status_baru}'.");
+            $laporan->tanggal_penyelesaian = $request->status_baru === 'Selesai' ? now() : null;
+            $laporan->save();
+
+            RiwayatLaporan::create([
+                'detail_laporan_id' => $laporan->id,
+                'user_id'           => Auth::id(),
+                'status_sebelumnya' => $statusSebelumnya,
+                'status_baru'       => $request->status_baru,
+                'keterangan'        => $request->keterangan,
+            ]);
+
+            return redirect()->back()
+                ->with('success', "Status laporan {$laporan->kode_transaksi} berhasil diperbarui menjadi '{$request->status_baru}'.");
+        });
     }
 }
