@@ -23,6 +23,7 @@ class DetailLaporan extends Model
         'tindakan_awal',
         'prioritas',
         'status_laporan',
+        'status_peninjauan',
         'petugas_penangan_id',
         'tanggal_penyelesaian',
         'lampiran_file',

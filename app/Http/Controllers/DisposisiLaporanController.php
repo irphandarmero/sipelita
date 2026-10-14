@@ -29,6 +29,9 @@ class DisposisiLaporanController extends Controller
         if (!$laporan->masterLaporan || $laporan->masterLaporan->jenis_laporan !== 'Insidentil') {
             return redirect()->back()->with('error', 'Disposisi hanya tersedia untuk laporan Insidentil.');
         }
+        if (in_array($laporan->status_peninjauan, ['Menunggu', 'Ditolak'], true)) {
+            return redirect()->back()->with('error', 'Laporan harus disetujui Kepala Unit sebelum dapat didisposisikan.');
+        }
         $user = Auth::user();
 
         if ($user->role !== 'admin' && $user->unit_kerja_id != $laporan->unit_tujuan_id && $user->id != $laporan->petugas_penangan_id) {
@@ -59,14 +62,17 @@ class DisposisiLaporanController extends Controller
 
         DB::transaction(function () use ($laporan, $request, $unitPenerima) {
             $laporan = DetailLaporan::whereKey($laporan->id)->lockForUpdate()->firstOrFail();
-            if ($laporan->status_laporan === 'Selesai' || $laporan->status_laporan === 'Ditolak') {
-                return redirect()->back()->with('error', "Disposisi tidak dapat dikirimkan pada laporan berstatus '{$laporan->status_laporan}'.");
+            if (in_array($laporan->status_peninjauan, ['Menunggu', 'Ditolak'], true)) {
+                abort(409, 'Laporan harus disetujui Kepala Unit sebelum dapat didisposisikan.');
+            }
+            if (in_array($laporan->status_laporan, ['Selesai', 'Ditolak'], true)) {
+                abort(409, "Disposisi tidak dapat dikirimkan pada laporan berstatus '{$laporan->status_laporan}'.");
             }
             if ($laporan->disposisiLaporan()
                 ->where('unit_penerima_id', $request->unit_penerima_id)
                 ->whereIn('status_disposisi', ['Pending', 'Diproses'])
                 ->exists()) {
-                return redirect()->back()->with('error', 'Unit tersebut masih memiliki tugas disposisi aktif yang belum diselesaikan pada laporan ini.');
+                abort(409, 'Unit tersebut masih memiliki tugas disposisi aktif yang belum diselesaikan pada laporan ini.');
             }
 
             $statusSebelumnya = $laporan->status_laporan;
@@ -118,6 +124,9 @@ class DisposisiLaporanController extends Controller
         if (!$disposisi->detailLaporan->masterLaporan
             || $disposisi->detailLaporan->masterLaporan->jenis_laporan !== 'Insidentil') {
             return redirect()->back()->with('error', 'Disposisi hanya tersedia untuk laporan Insidentil.');
+        }
+        if (in_array($disposisi->detailLaporan->status_peninjauan, ['Menunggu', 'Ditolak'], true)) {
+            return redirect()->back()->with('error', 'Laporan belum disetujui Kepala Unit untuk diproses.');
         }
         if (Auth::user()->unit_kerja_id != $disposisi->unit_penerima_id) {
             abort(403);

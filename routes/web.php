@@ -47,10 +47,21 @@ Route::middleware('auth')->group(function () {
             $laporanQuery->where(function ($query) use ($unitId) {
                 $query->where('user_id', Auth::id())
                     ->orWhere('unit_asal_id', $unitId)
-                    ->orWhere('unit_tujuan_id', $unitId)
+                    ->orWhere(function ($destination) use ($unitId) {
+                        $destination->where('unit_tujuan_id', $unitId)
+                            ->where(function ($review) {
+                                $review->whereNull('status_peninjauan')
+                                    ->orWhere('status_peninjauan', 'Disetujui');
+                            });
+                    })
                     ->orWhereHas('disposisiLaporan', function ($disposisiQuery) use ($unitId) {
-                        $disposisiQuery->where('unit_pengirim_id', $unitId)
-                            ->orWhere('unit_penerima_id', $unitId);
+                        $disposisiQuery->where(function ($units) use ($unitId) {
+                            $units->where('unit_pengirim_id', $unitId)
+                                ->orWhere('unit_penerima_id', $unitId);
+                        })->whereHas('detailLaporan', function ($laporanQuery) {
+                            $laporanQuery->whereNull('status_peninjauan')
+                                ->orWhere('status_peninjauan', 'Disetujui');
+                        });
                     });
             });
         }
@@ -82,6 +93,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/create', [LaporanController::class, 'create'])->name('create');     // Form Tambah
         Route::post('/', [LaporanController::class, 'store'])->name('store');            // Simpan Laporan
         Route::get('/{id}', [LaporanController::class, 'show'])->name('show');          // Detail & Audit Trail
+        Route::patch('/{id}/review', [LaporanController::class, 'review'])->name('review'); // Tinjau laporan oleh Kepala Unit asal
         Route::patch('/{id}/status', [LaporanController::class, 'updateStatus'])->name('updateStatus'); // Update Status
     });
     // ----------------------------------------------------------------------

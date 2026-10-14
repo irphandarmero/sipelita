@@ -158,7 +158,11 @@
                                         @endif
                                     </td>
                                     <td class="pe-3">
-                                        @if($laporan->status_laporan == 'Diajukan')
+                                        @if($laporan->status_peninjauan === 'Menunggu')
+                                            <span class="badge bg-warning text-dark">Menunggu Peninjauan</span>
+                                        @elseif($laporan->status_peninjauan === 'Ditolak')
+                                            <span class="badge bg-danger">Ditolak Kepala Unit</span>
+                                        @elseif($laporan->status_laporan == 'Diajukan')
                                             <span class="badge bg-warning text-dark">Diajukan</span>
                                         @elseif($laporan->status_laporan == 'Diproses')
                                             <span class="badge bg-info text-dark">Diproses</span>

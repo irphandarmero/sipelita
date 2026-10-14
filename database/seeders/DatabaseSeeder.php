@@ -92,6 +92,13 @@ class DatabaseSeeder extends Seeder
             'unit_kerja_id' => $unitIGD->id,
             'role' => 'kepala_unit',
         ]);
+        $direksi = User::create([
+            'name' => 'Direksi Rumah Sakit',
+            'email' => 'direksi@sipelita.com',
+            'password' => Hash::make('password123'),
+            'unit_kerja_id' => $unitDireksi->id,
+            'role' => 'direksi',
+        ]);
 
         // seed master laporan
         // master laporan

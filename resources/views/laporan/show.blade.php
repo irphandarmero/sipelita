@@ -34,6 +34,34 @@
         </div>
     </div>
 
+    @if($canReview)
+        <div class="card border-warning shadow-sm mb-4">
+            <div class="card-body">
+                <h6 class="fw-bold text-warning mb-2">Laporan menunggu peninjauan Kepala Unit</h6>
+                <p class="text-muted small mb-3">Tinjau laporan dari petugas unit Anda. Laporan yang disetujui akan diteruskan ke unit tujuan; laporan yang ditolak tidak akan diteruskan.</p>
+                <div class="d-flex flex-column flex-md-row gap-3">
+                    <form action="{{ route('laporan.review', $laporan->id) }}" method="POST">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="keputusan" value="Disetujui">
+                        <button type="submit" class="btn btn-success btn-sm">
+                            <i class="bi bi-check-circle me-1"></i> Setujui dan Teruskan
+                        </button>
+                    </form>
+                    <form action="{{ route('laporan.review', $laporan->id) }}" method="POST" class="d-flex flex-column flex-md-row gap-2 flex-grow-1">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="keputusan" value="Ditolak">
+                        <input type="text" name="keterangan" class="form-control form-control-sm" maxlength="500" placeholder="Alasan penolakan wajib diisi" required>
+                        <button type="submit" class="btn btn-outline-danger btn-sm text-nowrap">
+                            <i class="bi bi-x-circle me-1"></i> Tolak Laporan
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <div class="row g-4">
         <!-- Main Detail Card & Disposisi Cards -->
         <div class="col-12 col-lg-8">
@@ -77,7 +105,13 @@
                                     'Ditolak'  => 'bg-danger',
                                 ][$laporan->status_laporan] ?? 'bg-secondary';
                             @endphp
-                            <span class="badge {{ $badgeStatus }}">{{ $laporan->status_laporan }}</span>
+                            @if($laporan->status_peninjauan === 'Menunggu')
+                                <span class="badge bg-warning text-dark">Menunggu Peninjauan</span>
+                            @elseif($laporan->status_peninjauan === 'Ditolak')
+                                <span class="badge bg-danger">Ditolak Kepala Unit</span>
+                            @else
+                                <span class="badge {{ $badgeStatus }}">{{ $laporan->status_laporan }}</span>
+                            @endif
                         </div>
                     </div>
 

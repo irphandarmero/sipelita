@@ -22,25 +22,49 @@ class LaporanController extends Controller
         $query = DetailLaporan::with(['user', 'unitAsal', 'unitTujuan', 'masterLaporan', 'petugasPenangan'])
             ->latest();
 
+        $availableToDestination = function ($scope) {
+            $scope->whereNull('status_peninjauan')
+                ->orWhere('status_peninjauan', 'Disetujui');
+        };
+
         // Filter berdasarkan jenis tampilan (Laporan Masuk Unit vs Laporan Saya)
         if ($request->get('view_type') === 'incoming') {
             $userUnitId = Auth::user()->unit_kerja_id;
             $query->where(function ($scope) use ($userUnitId) {
-                $scope->where('unit_tujuan_id', $userUnitId)
+                $scope->where(function ($destination) use ($userUnitId) {
+                    $destination->where('unit_tujuan_id', $userUnitId)
+                        ->where(function ($review) {
+                            $review->whereNull('status_peninjauan')
+                                ->orWhere('status_peninjauan', 'Disetujui');
+                        });
+                })
                     ->orWhereHas('disposisiLaporan', function ($disposisiQuery) use ($userUnitId) {
                         $disposisiQuery->where('unit_penerima_id', $userUnitId);
+                        $disposisiQuery->whereHas('detailLaporan', function ($laporanQuery) {
+                            $laporanQuery->whereNull('status_peninjauan')
+                                ->orWhere('status_peninjauan', 'Disetujui');
+                        });
                     });
             });
         } else {
             // Jika memilih view laporan saya / default
             if (!in_array(Auth::user()->role, ['admin', 'direksi'])) {
-                $query->where(function ($q) {
+                $userUnitId = Auth::user()->unit_kerja_id;
+                $query->where(function ($q) use ($availableToDestination, $userUnitId) {
                     $q->where('user_id', Auth::id())
-                      ->orWhere('unit_asal_id', Auth::user()->unit_kerja_id)
-                      ->orWhere('unit_tujuan_id', Auth::user()->unit_kerja_id)
-                      ->orWhereHas('disposisiLaporan', function ($disposisiQuery) {
-                          $disposisiQuery->where('unit_pengirim_id', Auth::user()->unit_kerja_id)
-                              ->orWhere('unit_penerima_id', Auth::user()->unit_kerja_id);
+                      ->orWhere('unit_asal_id', $userUnitId)
+                      ->orWhere(function ($destination) use ($availableToDestination, $userUnitId) {
+                          $destination->where('unit_tujuan_id', $userUnitId)
+                              ->where($availableToDestination);
+                      })
+                      ->orWhereHas('disposisiLaporan', function ($disposisiQuery) use ($userUnitId) {
+                          $disposisiQuery->where(function ($units) use ($userUnitId) {
+                              $units->where('unit_pengirim_id', $userUnitId)
+                                  ->orWhere('unit_penerima_id', $userUnitId);
+                          })->whereHas('detailLaporan', function ($laporanQuery) {
+                              $laporanQuery->whereNull('status_peninjauan')
+                                  ->orWhere('status_peninjauan', 'Disetujui');
+                          });
                       });
                 });
             }
@@ -158,7 +182,8 @@ class LaporanController extends Controller
             }
         }
 
-        DB::transaction(function () use ($validated, $kodeTransaksi, $lampiranPath, $masterLaporan) {
+        $needsReview = Auth::user()->role === 'petugas';
+        DB::transaction(function () use ($validated, $kodeTransaksi, $lampiranPath, $masterLaporan, $needsReview) {
             $laporan = DetailLaporan::create([
                 'kode_transaksi'     => $kodeTransaksi,
                 'user_id'            => Auth::id(),
@@ -173,6 +198,7 @@ class LaporanController extends Controller
                     : null,
                 'prioritas'          => $validated['prioritas'],
                 'status_laporan'     => 'Diajukan',
+                'status_peninjauan'  => $needsReview ? 'Menunggu' : null,
                 'lampiran_file'      => $lampiranPath,
             ]);
 
@@ -181,12 +207,16 @@ class LaporanController extends Controller
                 'user_id'           => Auth::id(),
                 'status_sebelumnya' => null,
                 'status_baru'       => 'Diajukan',
-                'keterangan'        => 'Laporan baru berhasil diajukan ke unit tujuan.',
+                'keterangan'        => $needsReview
+                    ? 'Laporan diajukan dan menunggu peninjauan Kepala Unit.'
+                    : 'Laporan baru berhasil diajukan ke unit tujuan.',
             ]);
         });
 
         return redirect()->route('laporan.index')
-            ->with('success', "Laporan [{$kodeTransaksi}] berhasil dibuat dan dikirim.");
+            ->with('success', $needsReview
+                ? "Laporan [{$kodeTransaksi}] berhasil dibuat dan menunggu peninjauan Kepala Unit."
+                : "Laporan [{$kodeTransaksi}] berhasil dibuat dan dikirim.");
     }
 
     /**
@@ -208,23 +238,95 @@ class LaporanController extends Controller
         ])->findOrFail($id);
 
         $user = Auth::user();
+        $reviewPendingOrRejected = in_array($laporan->status_peninjauan, ['Menunggu', 'Ditolak'], true);
+        $canViewAsDestination = !$reviewPendingOrRejected
+            && $user->unit_kerja_id == $laporan->unit_tujuan_id;
         $canView = in_array($user->role, ['admin', 'direksi'])
             || $user->id === $laporan->user_id
             || $user->id === $laporan->petugas_penangan_id
-            || in_array($user->unit_kerja_id, [$laporan->unit_asal_id, $laporan->unit_tujuan_id])
-            || $laporan->disposisiLaporan()->where(function ($query) use ($user) {
+            || $user->unit_kerja_id == $laporan->unit_asal_id
+            || $canViewAsDestination
+            || (!$reviewPendingOrRejected && $laporan->disposisiLaporan()->where(function ($query) use ($user) {
                 $query->where('unit_pengirim_id', $user->unit_kerja_id)
                     ->orWhere('unit_penerima_id', $user->unit_kerja_id);
-            })->exists();
+            })->exists());
         abort_unless($canView, 403);
 
         $unitKerjaList = UnitKerja::where('id', '!=', $laporan->unit_tujuan_id)->get();
-        $canManageStatus = $user->role === 'admin' || $user->unit_kerja_id == $laporan->unit_tujuan_id;
+        $canManageStatus = !in_array($laporan->status_peninjauan, ['Menunggu', 'Ditolak'], true)
+            && ($user->role === 'admin' || $user->unit_kerja_id == $laporan->unit_tujuan_id);
+        $canReview = $user->role === 'kepala_unit'
+            && $user->unit_kerja_id == $laporan->unit_asal_id
+            && $laporan->status_peninjauan === 'Menunggu';
         $isIncidentil = $laporan->masterLaporan && $laporan->masterLaporan->jenis_laporan === 'Insidentil';
         $canCreateDisposisi = $isIncidentil
+            && !$reviewPendingOrRejected
+            && !in_array($laporan->status_laporan, ['Selesai', 'Ditolak'], true)
             && ($canManageStatus || $user->id == $laporan->petugas_penangan_id);
 
-        return view('laporan.show', compact('laporan', 'unitKerjaList', 'canManageStatus', 'canCreateDisposisi', 'isIncidentil'));
+        return view('laporan.show', compact('laporan', 'unitKerjaList', 'canManageStatus', 'canCreateDisposisi', 'canReview', 'isIncidentil'));
+    }
+
+    /**
+     * Menyetujui atau menolak laporan petugas melalui Kepala Unit asal.
+     */
+    public function review(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'keputusan' => ['required', 'in:Disetujui,Ditolak'],
+            'keterangan' => [
+                Rule::requiredIf($request->input('keputusan') === 'Ditolak'),
+                'nullable',
+                'string',
+                'max:500',
+            ],
+        ], [
+            'keputusan.required' => 'Keputusan peninjauan wajib dipilih.',
+            'keterangan.required' => 'Alasan penolakan wajib diisi.',
+        ]);
+
+        $user = Auth::user();
+        abort_unless($user->role === 'kepala_unit', 403);
+
+        $reviewed = DB::transaction(function () use ($id, $validated, $user) {
+            $laporan = DetailLaporan::whereKey($id)->lockForUpdate()->firstOrFail();
+            abort_unless($user->unit_kerja_id == $laporan->unit_asal_id, 403);
+
+            if ($laporan->status_peninjauan !== 'Menunggu') {
+                return false;
+            }
+
+            $statusSebelumnya = $laporan->status_laporan;
+            $laporan->status_peninjauan = $validated['keputusan'];
+            if ($validated['keputusan'] === 'Ditolak') {
+                $laporan->status_laporan = 'Ditolak';
+            }
+            $laporan->save();
+
+            $keterangan = $validated['keputusan'] === 'Ditolak'
+                ? "Kepala Unit menolak laporan. Alasan: {$validated['keterangan']}"
+                : 'Kepala Unit menyetujui laporan untuk diteruskan ke unit tujuan.';
+            RiwayatLaporan::create([
+                'detail_laporan_id' => $laporan->id,
+                'user_id' => $user->id,
+                'status_sebelumnya' => $statusSebelumnya,
+                'status_baru' => $laporan->status_laporan,
+                'keterangan' => $keterangan,
+            ]);
+
+            return true;
+        });
+
+        if (!$reviewed) {
+            return redirect()->back()->with('error', 'Laporan ini sudah ditinjau atau tidak lagi menunggu keputusan.');
+        }
+
+        return redirect()->back()->with(
+            'success',
+            $validated['keputusan'] === 'Ditolak'
+                ? 'Laporan ditolak dan tidak diteruskan ke unit tujuan.'
+                : 'Laporan disetujui dan diteruskan ke unit tujuan.'
+        );
     }
 
     /**
@@ -241,6 +343,10 @@ class LaporanController extends Controller
         ]);
 
         $laporan = DetailLaporan::findOrFail($id);
+        if (in_array($laporan->status_peninjauan, ['Menunggu', 'Ditolak'], true)) {
+            return redirect()->back()->with('error', 'Laporan harus disetujui Kepala Unit sebelum dapat diproses.');
+        }
+
         // 1. Otorisasi Hak Akses Unit
         if (Auth::user()->role !== 'admin' && Auth::user()->unit_kerja_id != $laporan->unit_tujuan_id) {
             return redirect()->back()->with('error', 'Anda tidak memiliki hak akses untuk menindaklanjuti atau mengubah status laporan unit ini.');
@@ -253,6 +359,9 @@ class LaporanController extends Controller
 
         return DB::transaction(function () use ($id, $request) {
             $laporan = DetailLaporan::whereKey($id)->lockForUpdate()->firstOrFail();
+            if (in_array($laporan->status_peninjauan, ['Menunggu', 'Ditolak'], true)) {
+                return redirect()->back()->with('error', 'Laporan harus disetujui Kepala Unit sebelum dapat diproses.');
+            }
 
             if (Auth::user()->role !== 'admin' && Auth::user()->unit_kerja_id != $laporan->unit_tujuan_id) {
                 abort(403);

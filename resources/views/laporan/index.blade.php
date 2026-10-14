@@ -170,7 +170,11 @@
 
                             <!-- 7. Badge Status Laporan -->
                             <td>
-                                @if($laporan->status_laporan == 'Diajukan')
+                                @if($laporan->status_peninjauan === 'Menunggu')
+                                    <span class="badge bg-warning text-dark px-2 py-1"><i class="bi bi-hourglass-split me-1"></i>Menunggu Tinjauan</span>
+                                @elseif($laporan->status_peninjauan === 'Ditolak')
+                                    <span class="badge bg-danger px-2 py-1"><i class="bi bi-x-circle-fill me-1"></i>Ditolak Kepala Unit</span>
+                                @elseif($laporan->status_laporan == 'Diajukan')
                                     <span class="badge bg-warning text-dark px-2 py-1"><i class="bi bi-hourglass-split me-1"></i>Diajukan</span>
                                 @elseif($laporan->status_laporan == 'Diproses')
                                     <span class="badge bg-info text-dark px-2 py-1"><i class="bi bi-gear-wide-connected me-1"></i>Diproses</span>
@@ -192,7 +196,8 @@
                                     </a>
 
                                     <!-- Tombol Update Status via Modal (Khusus Petugas/Admin/Unit Tujuan) -->
-                                    @if(in_array(Auth::user()->role ?? '', ['admin', 'petugas', 'kepala_unit']))
+                                    @if((Auth::user()->role === 'admin' || Auth::user()->unit_kerja_id == $laporan->unit_tujuan_id)
+                                        && !in_array($laporan->status_peninjauan, ['Menunggu', 'Ditolak'], true))
                                         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalStatus{{ $laporan->id }}" title="Tindak Lanjut Status">
                                             <i class="bi bi-pencil-square"></i>
                                         </button>
@@ -232,7 +237,8 @@
 <!-- MODAL DIALOG UPDATE STATUS (Per Baris Data) -->
 <!-- ========================================== -->
 @foreach($laporanList as $laporan)
-    @if(in_array(Auth::user()->role ?? '', ['admin', 'petugas', 'kepala_unit']))
+    @if((Auth::user()->role === 'admin' || Auth::user()->unit_kerja_id == $laporan->unit_tujuan_id)
+        && !in_array($laporan->status_peninjauan, ['Menunggu', 'Ditolak'], true))
         <div class="modal fade" id="modalStatus{{ $laporan->id }}" tabindex="-1" aria-labelledby="modalStatusLabel{{ $laporan->id }}" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content border-0 shadow">
