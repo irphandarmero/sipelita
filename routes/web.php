@@ -93,6 +93,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/create', [LaporanController::class, 'create'])->name('create');     // Form Tambah
         Route::post('/', [LaporanController::class, 'store'])->name('store');            // Simpan Laporan
         Route::get('/{id}', [LaporanController::class, 'show'])->name('show');          // Detail & Audit Trail
+        Route::get('/{id}/edit', [LaporanController::class, 'edit'])->name('edit');      // Edit laporan oleh pembuat sebelum diproses
+        Route::put('/{id}', [LaporanController::class, 'update'])->name('update');      // Simpan perubahan isi laporan
         Route::patch('/{id}/review', [LaporanController::class, 'review'])->name('review'); // Tinjau laporan oleh Kepala Unit asal
         Route::patch('/{id}/status', [LaporanController::class, 'updateStatus'])->name('updateStatus'); // Update Status
     });

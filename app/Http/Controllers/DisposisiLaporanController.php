@@ -128,7 +128,7 @@ class DisposisiLaporanController extends Controller
         if (in_array($disposisi->detailLaporan->status_peninjauan, ['Menunggu', 'Ditolak'], true)) {
             return redirect()->back()->with('error', 'Laporan belum disetujui Kepala Unit untuk diproses.');
         }
-        if (Auth::user()->unit_kerja_id != $disposisi->unit_penerima_id) {
+        if (Auth::user()->role !== 'admin' && Auth::user()->unit_kerja_id != $disposisi->unit_penerima_id) {
             abort(403);
         }
 

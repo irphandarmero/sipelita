@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Buat Laporan Baru')
+@section('title', $isEditing ? 'Edit Laporan' : 'Buat Laporan Baru')
 
 @section('content')
 <div class="row justify-content-center">
@@ -9,10 +9,10 @@
         <div class="d-flex align-items-center justify-content-between mb-4">
             <div>
                 <h4 class="fw-bold mb-1 text-dark">
-                    <i class="bi bi-plus-circle text-primary me-2"></i>Buat Laporan / Aduan Baru
+                    <i class="bi bi-plus-circle text-primary me-2"></i>{{ $isEditing ? 'Edit Laporan / Aduan' : 'Buat Laporan / Aduan Baru' }}
                 </h4>
                 <p class="text-muted mb-0 small">
-                    Isi formulir di bawah ini untuk mengirimkan laporan rutin atau aduan insidentil antar-unit RS.
+                    {{ $isEditing ? 'Perbarui isi laporan sebelum ditinjau atau diproses.' : 'Isi formulir di bawah ini untuk mengirimkan laporan rutin atau aduan insidentil antar-unit RS.' }}
                 </p>
             </div>
             <a href="{{ route('laporan.index') }}" class="btn btn-outline-secondary btn-sm fw-semibold">
@@ -23,8 +23,11 @@
         <!-- Form Card -->
         <div class="card border-0 shadow-sm">
             <div class="card-body p-4">
-                <form action="{{ route('laporan.store') }}" method="POST" enctype="multipart/form-data">
+                <form action="{{ $isEditing ? route('laporan.update', $laporan->id) : route('laporan.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
+                    @if($isEditing)
+                        @method('PUT')
+                    @endif
 
                     <!-- 1. INFORMASI PENGIRIM (OTOMATIS SAKSI UNITT) -->
                     <div class="alert alert-primary bg-primary bg-opacity-10 border-0 d-flex align-items-center p-3 mb-4">
@@ -43,9 +46,9 @@
                             </label>
                             <select name="master_laporan_id" id="master_laporan_id" 
                                     class="form-select @error('master_laporan_id') is-invalid @enderror" required>
-                                <option value="">-- Pilih Kategori Laporan --</option>
+                                <option value="" {{ old('master_laporan_id', $isEditing ? $laporan->master_laporan_id : '') == '' ? 'selected' : '' }}>-- Pilih Kategori Laporan --</option>
                                 @foreach($masterLaporanList as $kategori)
-                                    <option value="{{ $kategori->id }}" data-jenis="{{ $kategori->jenis_laporan }}" {{ old('master_laporan_id') == $kategori->id ? 'selected' : '' }}>
+                                    <option value="{{ $kategori->id }}" data-jenis="{{ $kategori->jenis_laporan }}" {{ old('master_laporan_id', $isEditing ? $laporan->master_laporan_id : '') == $kategori->id ? 'selected' : '' }}>
                                         [{{ $kategori->jenis_laporan }}] {{ $kategori->nama_laporan }}
                                     </option>
                                 @endforeach
@@ -69,9 +72,9 @@
                             </label>
                             <select name="unit_tujuan_id" id="unit_tujuan_id" 
                                     class="form-select @error('unit_tujuan_id') is-invalid @enderror" required>
-                                <option value="">-- Pilih Unit Tujuan --</option>
+                                <option value="" {{ old('unit_tujuan_id', $isEditing ? $laporan->unit_tujuan_id : '') == '' ? 'selected' : '' }}>-- Pilih Unit Tujuan --</option>
                                 @foreach($unitKerjaList as $unit)
-                                    <option value="{{ $unit->id }}" {{ old('unit_tujuan_id') == $unit->id ? 'selected' : '' }}>
+                                    <option value="{{ $unit->id }}" {{ old('unit_tujuan_id', $isEditing ? $laporan->unit_tujuan_id : '') == $unit->id ? 'selected' : '' }}>
                                         {{ $unit->nama_unit }} ({{ $unit->kode_unit }})
                                     </option>
                                 @endforeach
@@ -89,7 +92,7 @@
                             </label>
                             <input type="text" name="judul_laporan" id="judul_laporan" 
                                    class="form-control @error('judul_laporan') is-invalid @enderror" 
-                                   value="{{ old('judul_laporan') }}" 
+                                   value="{{ old('judul_laporan', $isEditing ? $laporan->judul_laporan : '') }}"
                                    placeholder="Contoh: PC Triase IGD Tidak Bisa Cetak Struk Pasien" required>
                             @error('judul_laporan')
                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -103,10 +106,10 @@
                             </label>
                             <select name="prioritas" id="prioritas" 
                                     class="form-select @error('prioritas') is-invalid @enderror" required>
-                                <option value="Rendah" {{ old('prioritas') == 'Rendah' ? 'selected' : '' }}>Rendah (Rutinitas biasa)</option>
-                                <option value="Sedang" {{ old('prioritas', 'Sedang') == 'Sedang' ? 'selected' : '' }}>Sedang (Perlu penanganan standar)</option>
-                                <option value="Tinggi" {{ old('prioritas') == 'Tinggi' ? 'selected' : '' }}>Tinggi (Mempengaruhi pelayanan)</option>
-                                <option value="Darurat" {{ old('prioritas') == 'Darurat' ? 'selected' : '' }}>Darurat 🔥 (Layanan kritis terhenti)</option>
+                                <option value="Rendah" {{ old('prioritas', $isEditing ? $laporan->prioritas : '') == 'Rendah' ? 'selected' : '' }}>Rendah (Rutinitas biasa)</option>
+                                <option value="Sedang" {{ old('prioritas', $isEditing ? $laporan->prioritas : 'Sedang') == 'Sedang' ? 'selected' : '' }}>Sedang (Perlu penanganan standar)</option>
+                                <option value="Tinggi" {{ old('prioritas', $isEditing ? $laporan->prioritas : '') == 'Tinggi' ? 'selected' : '' }}>Tinggi (Mempengaruhi pelayanan)</option>
+                                <option value="Darurat" {{ old('prioritas', $isEditing ? $laporan->prioritas : '') == 'Darurat' ? 'selected' : '' }}>Darurat 🔥 (Layanan kritis terhenti)</option>
                             </select>
                             @error('prioritas')
                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -120,7 +123,7 @@
                             </label>
                             <input type="datetime-local" name="tanggal_kejadian" id="tanggal_kejadian" 
                                    class="form-control @error('tanggal_kejadian') is-invalid @enderror" 
-                                   value="{{ old('tanggal_kejadian', date('Y-m-d\TH:i')) }}" required>
+                                   value="{{ old('tanggal_kejadian', $isEditing ? $laporan->tanggal_kejadian->format('Y-m-d\TH:i') : date('Y-m-d\TH:i')) }}" required>
                             @error('tanggal_kejadian')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -133,7 +136,7 @@
                             </label>
                             <textarea name="deskripsi_kejadian" id="deskripsi_kejadian" rows="4" 
                                       class="form-control @error('deskripsi_kejadian') is-invalid @enderror" 
-                                      placeholder="Jelaskan secara rinci kondisi masalah, lokasi tepatnya, atau data sensus yang dilaporkan..." required>{{ old('deskripsi_kejadian') }}</textarea>
+                                      placeholder="Jelaskan secara rinci kondisi masalah, lokasi tepatnya, atau data sensus yang dilaporkan..." required>{{ old('deskripsi_kejadian', $isEditing ? $laporan->deskripsi_kejadian : '') }}</textarea>
                             @error('deskripsi_kejadian')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -147,6 +150,9 @@
                             <input type="file" name="lampiran_file" id="lampiran"
                                    class="form-control @error('lampiran_file') is-invalid @enderror"
                                    accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+                            @if($isEditing && $laporan->lampiran_file)
+                                <small class="text-muted d-block mt-1">Lampiran saat ini: <a href="{{ asset('storage/' . $laporan->lampiran_file) }}" target="_blank" rel="noopener">Lihat lampiran</a>. Kosongkan jika tidak ingin menggantinya.</small>
+                            @endif
                             @error('lampiran_file')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -160,7 +166,7 @@
                             </label>
                             <textarea name="tindakan_awal" id="tindakan_awal" rows="2" 
                                       class="form-control @error('tindakan_awal') is-invalid @enderror" 
-                                      placeholder="Jelaskan tindakan yang telah dilakukan sebelum laporan dikirim...">{{ old('tindakan_awal') }}</textarea>
+                                      placeholder="Jelaskan tindakan yang telah dilakukan sebelum laporan dikirim...">{{ old('tindakan_awal', $isEditing ? $laporan->tindakan_awal : '') }}</textarea>
                             @error('tindakan_awal')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -170,9 +176,9 @@
                     <!-- Button Footer -->
                     <hr class="my-4">
                     <div class="d-flex justify-content-end gap-2">
-                        <a href="{{ route('laporan.index') }}" class="btn btn-light border px-4 fw-semibold">Batal</a>
+                        <a href="{{ $isEditing ? route('laporan.show', $laporan->id) : route('laporan.index') }}" class="btn btn-light border px-4 fw-semibold">Batal</a>
                         <button type="submit" class="btn btn-primary px-4 fw-semibold">
-                            <i class="bi bi-send-fill me-2"></i>Kirim Laporan
+                            <i class="bi {{ $isEditing ? 'bi-save' : 'bi-send-fill' }} me-2"></i>{{ $isEditing ? 'Simpan Perubahan' : 'Kirim Laporan' }}
                         </button>
                     </div>
                 </form>

@@ -17,6 +17,12 @@
         </div>
         <div class="mt-3 mt-md-0 d-flex gap-2">
             <a href="{{ route('laporan.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Kembali</a>
+
+            @if($canEdit)
+                <a href="{{ route('laporan.edit', $laporan->id) }}" class="btn btn-outline-warning btn-sm">
+                    <i class="bi bi-pencil me-1"></i> Edit Laporan
+                </a>
+            @endif
             
             <!-- Tombol Disposisi khusus Unit Tujuan / Admin / Petugas -->
             @if($canCreateDisposisi)
@@ -37,8 +43,14 @@
     @if($canReview)
         <div class="card border-warning shadow-sm mb-4">
             <div class="card-body">
-                <h6 class="fw-bold text-warning mb-2">Laporan menunggu peninjauan Kepala Unit</h6>
-                <p class="text-muted small mb-3">Tinjau laporan dari petugas unit Anda. Laporan yang disetujui akan diteruskan ke unit tujuan; laporan yang ditolak tidak akan diteruskan.</p>
+                <h6 class="fw-bold text-warning mb-2">Laporan menunggu peninjauan</h6>
+                <p class="text-muted small mb-3">
+                    @if(Auth::user()->role === 'admin')
+                        Sebagai Admin, Anda dapat meninjau laporan ini. Laporan yang disetujui akan diteruskan ke unit tujuan; laporan yang ditolak tidak akan diteruskan.
+                    @else
+                        Tinjau laporan dari petugas unit Anda. Laporan yang disetujui akan diteruskan ke unit tujuan; laporan yang ditolak tidak akan diteruskan.
+                    @endif
+                </p>
                 <div class="d-flex flex-column flex-md-row gap-3">
                     <form action="{{ route('laporan.review', $laporan->id) }}" method="POST">
                         @csrf
@@ -87,7 +99,7 @@
                         </div>
                         <div class="col-6 col-md-3">
                             <small class="text-muted d-block" style="font-size: 0.75rem;">Tanggal Kejadian</small>
-                            <span class="fw-semibold">{{ $laporan->tanggal_kejadian->format('d M Y, H:i') }} WIB</span>
+                            <span class="fw-semibold">{{ $laporan->tanggal_kejadian->format('d/m/Y H:i') }} WIB</span>
                         </div>
                         <div class="col-6 col-md-3">
                             <small class="text-muted d-block" style="font-size: 0.75rem;">Jenis Laporan</small>
@@ -219,7 +231,7 @@
 
                                         <div class="d-flex justify-content-between align-items-center pt-2 border-top mt-2">
                                             <small class="text-muted" style="font-size: 0.725rem;">
-                                                <i class="bi bi-clock me-1"></i>{{ \Carbon\Carbon::parse($disposisi->tanggal_disposisi)->format('d M Y, H:i') }}
+                                                <i class="bi bi-clock me-1"></i>{{ \Carbon\Carbon::parse($disposisi->tanggal_disposisi)->format('d/m/Y H:i') }}
                                                 @if($disposisi->userPengirim)
                                                      • Dikirim oleh: {{ $disposisi->userPengirim->name }}
                                                 @endif
@@ -239,7 +251,7 @@
 
                                             <div class="d-flex gap-1">
                                                 <!-- Tombol Update Disposisi bagi Unit Penerima -->
-                                                @if(Auth::user()->unit_kerja_id == $disposisi->unit_penerima_id)
+                                                @if(Auth::user()->role === 'admin' || Auth::user()->unit_kerja_id == $disposisi->unit_penerima_id)
                                                     <button type="button" class="btn btn-xs btn-outline-primary btn-update-disposisi" 
                                                             data-bs-toggle="modal" 
                                                             data-bs-target="#modalUpdateDisposisi"
@@ -285,7 +297,7 @@
                                 <div class="position-absolute bg-primary rounded-circle" style="width: 10px; height: 10px; left: -6px; top: 4px;"></div>
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <span class="badge bg-secondary" style="font-size: 0.65rem;">{{ $riwayat->status_baru ?? 'Log Event' }}</span>
-                                    <small class="text-muted" style="font-size: 0.7rem;">{{ $riwayat->created_at->format('d M, H:i') }}</small>
+                                    <small class="text-muted" style="font-size: 0.7rem;">{{ $riwayat->created_at->format('d/m/Y H:i:s') }}</small>
                                 </div>
                                 <div class="fw-bold text-dark small">{{ $riwayat->user->name ?? 'Sistem' }}</div>
                                 <p class="text-muted small mb-0 mt-1" style="font-size: 0.8rem;">{{ $riwayat->keterangan }}</p>

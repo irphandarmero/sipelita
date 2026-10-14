@@ -109,6 +109,11 @@ class LaporanController extends Controller
         }
 
         $laporanList = $query->paginate(10)->withQueryString();
+        $laporanList->getCollection()->transform(function (DetailLaporan $laporan) {
+            $laporan->setAttribute('can_edit', $this->canEditReport($laporan));
+
+            return $laporan;
+        });
         $unitKerjaList = UnitKerja::all();
         $masterLaporanList = MasterLaporan::where('status_aktif', true)->get();
 
@@ -125,7 +130,103 @@ class LaporanController extends Controller
         $masterLaporanList = MasterLaporan::where('status_aktif', true)->get();
         $unitKerjaList = UnitKerja::where('id', '!=', Auth::user()->unit_kerja_id)->get();
 
-        return view('laporan.create', compact('masterLaporanList', 'unitKerjaList'));
+        $isEditing = false;
+
+        return view('laporan.create', compact('masterLaporanList', 'unitKerjaList', 'isEditing'));
+    }
+
+    /**
+     * Menampilkan formulir edit laporan kepada pembuat sebelum laporan diproses.
+     */
+    public function edit($id)
+    {
+        $laporan = DetailLaporan::with('masterLaporan')->findOrFail($id);
+        abort_unless($this->canEditReport($laporan), 403, 'Laporan ini tidak dapat diedit oleh akun Anda.');
+
+        $masterLaporanList = MasterLaporan::where('status_aktif', true)->get();
+        $unitKerjaList = UnitKerja::where('id', '!=', $laporan->unit_asal_id)->get();
+        $isEditing = true;
+
+        return view('laporan.create', compact('laporan', 'masterLaporanList', 'unitKerjaList', 'isEditing'));
+    }
+
+    /**
+     * Menyimpan perubahan laporan sebelum keputusan tinjauan atau penanganan.
+     */
+    public function update(Request $request, $id)
+    {
+        $laporan = DetailLaporan::with('masterLaporan')->findOrFail($id);
+        abort_unless($this->canEditReport($laporan), 403, 'Laporan ini tidak dapat diedit oleh akun Anda.');
+
+        $validated = $request->validate([
+            'master_laporan_id'  => ['required', Rule::exists('master_laporan', 'id')->where('status_aktif', true)],
+            'unit_tujuan_id'     => ['required', 'exists:unit_kerja,id', Rule::notIn([$laporan->unit_asal_id])],
+            'tanggal_kejadian'   => ['required', 'date_format:Y-m-d\TH:i'],
+            'judul_laporan'      => ['required', 'string', 'max:200'],
+            'deskripsi_kejadian' => ['required', 'string'],
+            'prioritas'          => ['required', 'in:Rendah,Sedang,Tinggi,Darurat'],
+            'tindakan_awal'      => [
+                Rule::requiredIf(function () use ($request) {
+                    return MasterLaporan::whereKey($request->input('master_laporan_id'))
+                        ->value('jenis_laporan') === 'Insidentil';
+                }),
+                'nullable',
+                'string',
+                'max:2000',
+            ],
+            'lampiran_file'      => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+        ], [
+            'unit_tujuan_id.not_in'       => 'Unit tujuan harus berbeda dengan unit asal.',
+            'tindakan_awal.required'      => 'Tindakan awal wajib dijelaskan untuk laporan Insidentil.',
+            'lampiran_file.image'         => 'Berkas lampiran harus berupa gambar (JPG/PNG).',
+            'lampiran_file.max'           => 'Ukuran foto lampiran maksimal 2MB.',
+        ]);
+
+        $masterLaporan = MasterLaporan::where('status_aktif', true)->findOrFail($validated['master_laporan_id']);
+        $lampiranPath = $laporan->lampiran_file;
+        if ($request->hasFile('lampiran_file')) {
+            $lampiranPath = $request->file('lampiran_file')->store('lampiran_laporan', 'public');
+            if ($lampiranPath === false) {
+                throw new \RuntimeException('Gagal menyimpan lampiran laporan.');
+            }
+        }
+
+        $updated = DB::transaction(function () use ($id, $validated, $masterLaporan, $lampiranPath) {
+            $laporan = DetailLaporan::whereKey($id)->lockForUpdate()->firstOrFail();
+            if (!$this->canEditReport($laporan)) {
+                return false;
+            }
+
+            $status = $laporan->status_laporan;
+            $laporan->update([
+                'master_laporan_id'  => $validated['master_laporan_id'],
+                'unit_tujuan_id'     => $validated['unit_tujuan_id'],
+                'tanggal_kejadian'   => $validated['tanggal_kejadian'],
+                'judul_laporan'      => $validated['judul_laporan'],
+                'deskripsi_kejadian' => $validated['deskripsi_kejadian'],
+                'tindakan_awal'      => $masterLaporan->jenis_laporan === 'Insidentil'
+                    ? ($validated['tindakan_awal'] ?? null)
+                    : null,
+                'prioritas'          => $validated['prioritas'],
+                'lampiran_file'      => $lampiranPath,
+            ]);
+
+            RiwayatLaporan::create([
+                'detail_laporan_id' => $laporan->id,
+                'user_id'           => Auth::id(),
+                'status_sebelumnya' => $status,
+                'status_baru'       => $status,
+                'keterangan'        => 'Isi laporan diperbarui.',
+            ]);
+
+            return true;
+        });
+
+        if (!$updated) {
+            return redirect()->back()->with('error', 'Laporan sudah tidak dapat diedit karena status atau keputusan tinjauannya telah berubah.');
+        }
+
+        return redirect()->route('laporan.show', $id)->with('success', 'Perubahan laporan berhasil disimpan.');
     }
 
     /**
@@ -253,18 +354,20 @@ class LaporanController extends Controller
         abort_unless($canView, 403);
 
         $unitKerjaList = UnitKerja::where('id', '!=', $laporan->unit_tujuan_id)->get();
-        $canManageStatus = !in_array($laporan->status_peninjauan, ['Menunggu', 'Ditolak'], true)
+        $canManageStatus = $laporan->status_laporan !== 'Selesai'
+            && !in_array($laporan->status_peninjauan, ['Menunggu', 'Ditolak'], true)
             && ($user->role === 'admin' || $user->unit_kerja_id == $laporan->unit_tujuan_id);
-        $canReview = $user->role === 'kepala_unit'
-            && $user->unit_kerja_id == $laporan->unit_asal_id
-            && $laporan->status_peninjauan === 'Menunggu';
+        $canReview = $laporan->status_peninjauan === 'Menunggu'
+            && ($user->role === 'admin'
+                || ($user->role === 'kepala_unit' && $user->unit_kerja_id == $laporan->unit_asal_id));
         $isIncidentil = $laporan->masterLaporan && $laporan->masterLaporan->jenis_laporan === 'Insidentil';
         $canCreateDisposisi = $isIncidentil
             && !$reviewPendingOrRejected
             && !in_array($laporan->status_laporan, ['Selesai', 'Ditolak'], true)
             && ($canManageStatus || $user->id == $laporan->petugas_penangan_id);
+        $canEdit = $this->canEditReport($laporan);
 
-        return view('laporan.show', compact('laporan', 'unitKerjaList', 'canManageStatus', 'canCreateDisposisi', 'canReview', 'isIncidentil'));
+        return view('laporan.show', compact('laporan', 'unitKerjaList', 'canManageStatus', 'canCreateDisposisi', 'canReview', 'isIncidentil', 'canEdit'));
     }
 
     /**
@@ -286,11 +389,14 @@ class LaporanController extends Controller
         ]);
 
         $user = Auth::user();
-        abort_unless($user->role === 'kepala_unit', 403);
+        abort_unless(in_array($user->role, ['admin', 'kepala_unit'], true), 403);
 
         $reviewed = DB::transaction(function () use ($id, $validated, $user) {
             $laporan = DetailLaporan::whereKey($id)->lockForUpdate()->firstOrFail();
-            abort_unless($user->unit_kerja_id == $laporan->unit_asal_id, 403);
+            abort_unless(
+                $user->role === 'admin' || $user->unit_kerja_id == $laporan->unit_asal_id,
+                403
+            );
 
             if ($laporan->status_peninjauan !== 'Menunggu') {
                 return false;
@@ -343,6 +449,9 @@ class LaporanController extends Controller
         ]);
 
         $laporan = DetailLaporan::findOrFail($id);
+        if ($laporan->status_laporan === 'Selesai') {
+            return redirect()->back()->with('error', 'Laporan yang sudah selesai tidak dapat diubah lagi.');
+        }
         if (in_array($laporan->status_peninjauan, ['Menunggu', 'Ditolak'], true)) {
             return redirect()->back()->with('error', 'Laporan harus disetujui Kepala Unit sebelum dapat diproses.');
         }
@@ -359,6 +468,9 @@ class LaporanController extends Controller
 
         return DB::transaction(function () use ($id, $request) {
             $laporan = DetailLaporan::whereKey($id)->lockForUpdate()->firstOrFail();
+            if ($laporan->status_laporan === 'Selesai') {
+                return redirect()->back()->with('error', 'Laporan yang sudah selesai tidak dapat diubah lagi.');
+            }
             if (in_array($laporan->status_peninjauan, ['Menunggu', 'Ditolak'], true)) {
                 return redirect()->back()->with('error', 'Laporan harus disetujui Kepala Unit sebelum dapat diproses.');
             }
@@ -379,6 +491,7 @@ class LaporanController extends Controller
                 if ($pendingDisposisiCount > 0) {
                     return redirect()->back()->with('error', "Laporan tidak dapat diselesaikan karena masih terdapat {$pendingDisposisiCount} tugas disposisi ke unit lain yang berstatus Menunggu atau Diproses.");
                 }
+
             }
 
             $statusSebelumnya = $laporan->status_laporan;
@@ -402,5 +515,12 @@ class LaporanController extends Controller
             return redirect()->back()
                 ->with('success', "Status laporan {$laporan->kode_transaksi} berhasil diperbarui menjadi '{$request->status_baru}'.");
         });
+    }
+
+    private function canEditReport(DetailLaporan $laporan): bool
+    {
+        return (Auth::user()->role === 'admin' || (int) $laporan->user_id === (int) Auth::id())
+            && $laporan->status_laporan === 'Diajukan'
+            && in_array($laporan->status_peninjauan, [null, 'Menunggu'], true);
     }
 }

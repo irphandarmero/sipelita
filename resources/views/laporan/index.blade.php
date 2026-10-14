@@ -195,8 +195,15 @@
                                         <i class="bi bi-eye"></i>
                                     </a>
 
+                                    @if($laporan->can_edit)
+                                        <a href="{{ route('laporan.edit', $laporan->id) }}" class="btn btn-outline-warning" title="Edit Laporan">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    @endif
+
                                     <!-- Tombol Update Status via Modal (Khusus Petugas/Admin/Unit Tujuan) -->
                                     @if((Auth::user()->role === 'admin' || Auth::user()->unit_kerja_id == $laporan->unit_tujuan_id)
+                                        && $laporan->status_laporan !== 'Selesai'
                                         && !in_array($laporan->status_peninjauan, ['Menunggu', 'Ditolak'], true))
                                         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalStatus{{ $laporan->id }}" title="Tindak Lanjut Status">
                                             <i class="bi bi-pencil-square"></i>
@@ -238,6 +245,7 @@
 <!-- ========================================== -->
 @foreach($laporanList as $laporan)
     @if((Auth::user()->role === 'admin' || Auth::user()->unit_kerja_id == $laporan->unit_tujuan_id)
+        && $laporan->status_laporan !== 'Selesai'
         && !in_array($laporan->status_peninjauan, ['Menunggu', 'Ditolak'], true))
         <div class="modal fade" id="modalStatus{{ $laporan->id }}" tabindex="-1" aria-labelledby="modalStatusLabel{{ $laporan->id }}" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
