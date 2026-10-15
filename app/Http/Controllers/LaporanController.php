@@ -174,12 +174,12 @@ class LaporanController extends Controller
                 'string',
                 'max:2000',
             ],
-            'lampiran_file'      => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'lampiran_file'      => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
         ], [
             'unit_tujuan_id.not_in'       => 'Unit tujuan harus berbeda dengan unit asal.',
             'tindakan_awal.required'      => 'Tindakan awal wajib dijelaskan untuk laporan Insidentil.',
-            'lampiran_file.image'         => 'Berkas lampiran harus berupa gambar (JPG/PNG).',
-            'lampiran_file.max'           => 'Ukuran foto lampiran maksimal 2MB.',
+            'lampiran_file.mimes'         => 'Berkas lampiran harus berupa JPG, JPEG, PNG, atau PDF.',
+            'lampiran_file.max'           => 'Ukuran berkas lampiran maksimal 5MB.',
         ]);
 
         $masterLaporan = MasterLaporan::where('status_aktif', true)->findOrFail($validated['master_laporan_id']);
@@ -254,7 +254,7 @@ class LaporanController extends Controller
                 'string',
                 'max:2000',
             ],
-            'lampiran_file'      => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'lampiran_file'      => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
         ], [
             'master_laporan_id.required'  => 'Kategori laporan wajib dipilih.',
             'unit_tujuan_id.required'     => 'Unit tujuan laporan wajib dipilih.',
@@ -264,8 +264,8 @@ class LaporanController extends Controller
             'deskripsi_kejadian.required' => 'Rincian deskripsi laporan wajib diisi.',
             'prioritas.required'          => 'Tingkat prioritas wajib dipilih.',
             'tindakan_awal.required'      => 'Tindakan awal wajib dijelaskan untuk laporan Insidentil.',
-            'lampiran_file.image'         => 'Berkas lampiran harus berupa gambar (JPG/PNG).',
-            'lampiran_file.max'           => 'Ukuran foto lampiran maksimal 2MB.',
+            'lampiran_file.mimes'         => 'Berkas lampiran harus berupa JPG, JPEG, PNG, atau PDF.',
+            'lampiran_file.max'           => 'Ukuran berkas lampiran maksimal 5MB.',
         ]));
 
         // Generate Kode Transaksi Otomatis (Contoh: RUT-20260928-001 / INC-20260928-001)

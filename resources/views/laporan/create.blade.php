@@ -142,21 +142,21 @@
                             @enderror
                         </div>
 
-                        <!-- 8. UPLOAD LAMPIRAN / BUKTI FOTO -->
+                        <!-- 8. UPLOAD LAMPIRAN / BUKTI -->
                         <div class="col-md-6">
                             <label for="lampiran" class="form-label fw-bold small text-dark">
-                                Lampiran Bukti / Foto Kerusakan <small class="text-muted fw-normal">(Opsional)</small>
+                                Lampiran Bukti / Foto / Dokumen <small class="text-muted fw-normal">(Opsional)</small>
                             </label>
                             <input type="file" name="lampiran_file" id="lampiran"
                                    class="form-control @error('lampiran_file') is-invalid @enderror"
-                                   accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+                                   accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf">
                             @if($isEditing && $laporan->lampiran_file)
                                 <small class="text-muted d-block mt-1">Lampiran saat ini: <a href="{{ asset('storage/' . $laporan->lampiran_file) }}" target="_blank" rel="noopener">Lihat lampiran</a>. Kosongkan jika tidak ingin menggantinya.</small>
                             @endif
                             @error('lampiran_file')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
-                            <small class="text-muted d-block mt-1">Format: JPG atau PNG (Maks. 2MB).</small>
+                            <small class="text-muted d-block mt-1">Format: JPG, JPEG, PNG, atau PDF (maksimal 5MB).</small>
                         </div>
 
                         <!-- 9. TINDAKAN AWAL SEBELUMNYA -->

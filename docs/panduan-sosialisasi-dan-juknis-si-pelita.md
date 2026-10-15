@@ -96,7 +96,7 @@ Isi dan kirim laporan
      - Darurat — layanan kritis terhenti.
    - **Tanggal & Waktu Kejadian**: masukkan waktu kejadian yang sebenarnya.
    - **Rincian Kejadian / Isi Laporan**: tulis lokasi, kronologi, kondisi, dampak, atau data yang dilaporkan secara jelas.
-   - **Lampiran Bukti** (opsional): format JPG/JPEG/PNG, maksimal 2 MB.
+   - **Lampiran Bukti** (opsional): format JPG/JPEG/PNG atau PDF, maksimal 5 MB.
 4. Jika kategori berjenis **Insidentil**, isi **Tindakan Awal Yang Sudah Dilakukan**. Form akan menampilkan panduan kronologi, lokasi, dampak, dan tindakan awal.
 5. Periksa kembali data, lalu pilih **Kirim Laporan**.
 6. Sistem membuat kode transaksi dengan awalan `RUT` untuk laporan Rutin atau `INC` untuk laporan Insidentil, tanggal pembuatan, dan rangkaian karakter.
