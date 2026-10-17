@@ -28,18 +28,24 @@ class AuthController extends Controller
     {
         // 1. Validasi input
         $credentials = $request->validate([
-            'email'    => ['required', 'email'],
+            'login'    => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
         ], [
-            'email.required'    => 'Alamat email wajib diisi.',
-            'email.email'       => 'Format email tidak valid.',
+            'login.required'    => 'Email atau username wajib diisi.',
             'password.required' => 'Password wajib diisi.',
         ]);
 
-        // 2. Coba autentikasi pengguna
+        $login = trim($credentials['login']);
+        $loginField = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+        $loginValue = $loginField === 'username' ? strtolower($login) : $login;
+
+        // 2. Coba autentikasi menggunakan email atau username
         $remember = $request->has('remember');
 
-        if (Auth::attempt($credentials, $remember)) {
+        if (Auth::attempt([
+            $loginField => $loginValue,
+            'password' => $credentials['password'],
+        ], $remember)) {
             // Regenerasi session untuk keamanan (mencegah Session Fixation attack)
             $request->session()->regenerate();
 
@@ -53,8 +59,8 @@ class AuthController extends Controller
 
         // 3. Jika autentikasi gagal
         return back()->withErrors([
-            'email' => 'Alamat email atau password yang Anda masukkan salah.',
-        ])->onlyInput('email');
+            'login' => 'Email/username atau password yang Anda masukkan salah.',
+        ])->onlyInput('login');
     }
 
     /**

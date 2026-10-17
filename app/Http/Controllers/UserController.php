@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\UnitKerja;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
@@ -20,6 +21,7 @@ class UserController extends Controller
     {
         $request->validate([
             'name'          => ['required', 'string', 'max:255'],
+            'username'      => ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9._-]+$/', Rule::unique('users', 'username')],
             'email'         => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password'      => ['required', 'string', 'min:6'],
             'unit_kerja_id' => ['required', 'exists:unit_kerja,id'],
@@ -28,6 +30,9 @@ class UserController extends Controller
             'name.required'          => 'Nama lengkap wajib diisi.',
             'email.required'         => 'Alamat email wajib diisi.',
             'email.unique'           => 'Alamat email sudah terdaftar.',
+            'username.required'      => 'Username wajib diisi.',
+            'username.regex'         => 'Username hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda hubung.',
+            'username.unique'        => 'Username sudah digunakan.',
             'password.required'      => 'Password wajib diisi.',
             'unit_kerja_id.required' => 'Unit kerja wajib dipilih.',
             'role.required'          => 'Role akses pengguna wajib dipilih.',
@@ -35,6 +40,7 @@ class UserController extends Controller
 
         User::create([
             'name'          => $request->name,
+            'username'      => strtolower(trim($request->username)),
             'email'         => $request->email,
             'password'      => Hash::make($request->password),
             'unit_kerja_id' => $request->unit_kerja_id,
@@ -50,6 +56,7 @@ class UserController extends Controller
 
         $request->validate([
             'name'          => ['required', 'string', 'max:255'],
+            'username'      => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9._-]+$/', Rule::unique('users', 'username')->ignore($user->id)],
             'email'         => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $id],
             'unit_kerja_id' => ['required', 'exists:unit_kerja,id'],
             'role'          => ['required', 'in:admin,petugas,kepala_unit,direksi'],
@@ -58,6 +65,7 @@ class UserController extends Controller
 
         $dataUpdate = [
             'name'          => $request->name,
+            'username'      => $request->filled('username') ? strtolower(trim($request->username)) : null,
             'email'         => $request->email,
             'unit_kerja_id' => $request->unit_kerja_id,
             'role'          => $request->role,

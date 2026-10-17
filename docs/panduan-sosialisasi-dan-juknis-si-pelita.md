@@ -69,7 +69,7 @@ Isi dan kirim laporan
 
 ## 5. Masuk, dashboard, dan navigasi
 
-1. Buka halaman SI-PELITA dan masukkan **email terdaftar** serta kata sandi.
+1. Buka halaman SI-PELITA dan masukkan **email atau username terdaftar** serta kata sandi.
 2. Pilih **Masuk Aplikasi**. Opsi **Ingat Saya** dapat dipilih bila sesuai kebijakan perangkat.
 3. Setelah berhasil masuk, pengguna berada di **Dashboard**. Dashboard menampilkan ringkasan total, laporan Diajukan, Diproses, Selesai, dan beberapa laporan terbaru sesuai cakupan akses pengguna.
 4. Gunakan menu di sisi aplikasi:
@@ -185,7 +185,7 @@ Menu **Administrator → Master Data** berisi:
 
 - **Unit Kerja RS**: menambah, mengubah, atau menghapus unit. Unit yang masih terhubung ke pengguna atau laporan tidak dapat dihapus.
 - **Kategori Laporan**: membuat kategori Rutin atau Insidentil dan mengaktifkan/menonaktifkannya. Kategori yang sudah digunakan dalam transaksi akan dinonaktifkan, bukan dihapus.
-- **Manajemen Users**: membuat, mengubah, atau menghapus akun; mengatur nama, email, unit kerja, peran akses, dan kata sandi.
+- **Manajemen Users**: membuat, mengubah, atau menghapus akun; mengatur nama, username, email, unit kerja, peran akses, dan kata sandi. Username wajib diisi untuk akun baru dan dapat dikosongkan pada akun lama yang masih menggunakan login email.
 
 Saat membuat akun, pilih peran yang benar. Peran **Petugas** memiliki alur tinjauan Kepala Unit ketika membuat laporan, sehingga kesalahan pemilihan peran dapat mengubah alur kerja laporan.
 

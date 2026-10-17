@@ -93,7 +93,7 @@
                             <input type="text" name="judul_laporan" id="judul_laporan" 
                                    class="form-control @error('judul_laporan') is-invalid @enderror" 
                                    value="{{ old('judul_laporan', $isEditing ? $laporan->judul_laporan : '') }}"
-                                   placeholder="Contoh: PC Triase IGD Tidak Bisa Cetak Struk Pasien" required>
+                                   required>
                             @error('judul_laporan')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -136,7 +136,7 @@
                             </label>
                             <textarea name="deskripsi_kejadian" id="deskripsi_kejadian" rows="4" 
                                       class="form-control @error('deskripsi_kejadian') is-invalid @enderror" 
-                                      placeholder="Jelaskan secara rinci kondisi masalah, lokasi tepatnya, atau data sensus yang dilaporkan..." required>{{ old('deskripsi_kejadian', $isEditing ? $laporan->deskripsi_kejadian : '') }}</textarea>
+                                      required>{{ old('deskripsi_kejadian', $isEditing ? $laporan->deskripsi_kejadian : '') }}</textarea>
                             @error('deskripsi_kejadian')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror

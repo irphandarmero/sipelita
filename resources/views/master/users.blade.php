@@ -36,6 +36,7 @@
                     <tr>
                         <th class="ps-3" style="width: 80px;">No</th>
                         <th>Nama Pengguna</th>
+                        <th>Username</th>
                         <th>Alamat Email</th>
                         <th>Unit Kerja</th>
                         <th>Role Akses</th>
@@ -47,6 +48,7 @@
                         <tr>
                             <td class="ps-3 text-muted">{{ $index + 1 }}</td>
                             <td class="fw-bold text-dark">{{ $user->name }}</td>
+                            <td><span class="text-muted">{{ $user->username ?? 'Belum diatur' }}</span></td>
                             <td><span class="text-muted">{{ $user->email }}</span></td>
                             <td>
                                 <span class="badge bg-secondary bg-opacity-10 text-secondary border">
@@ -95,6 +97,11 @@
                                                 <input type="text" name="name" class="form-control" value="{{ $user->name }}" required>
                                             </div>
                                             <div class="mb-3">
+                                                <label class="form-label fw-semibold">Username <small class="text-muted fw-normal">(Opsional)</small></label>
+                                                <input type="text" name="username" class="form-control" value="{{ $user->username }}" maxlength="50" pattern="[A-Za-z0-9._-]+">
+                                                <small class="text-muted">Huruf, angka, titik, garis bawah, dan tanda hubung.</small>
+                                            </div>
+                                            <div class="mb-3">
                                                 <label class="form-label fw-semibold">Alamat Email</label>
                                                 <input type="email" name="email" class="form-control" value="{{ $user->email }}" required>
                                             </div>
@@ -132,7 +139,7 @@
                         </div>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center py-4 text-muted">Belum ada data pengguna yang terdaftar.</td>
+                            <td colspan="7" class="text-center py-4 text-muted">Belum ada data pengguna yang terdaftar.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -155,6 +162,11 @@
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Nama Lengkap</label>
                         <input type="text" name="name" class="form-control" placeholder="Nama & Gelar Staf" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Username</label>
+                        <input type="text" name="username" class="form-control" placeholder="contoh: user.igd" maxlength="50" pattern="[A-Za-z0-9._-]+" required>
+                        <small class="text-muted">Username wajib diisi dan hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda hubung.</small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Alamat Email</label>

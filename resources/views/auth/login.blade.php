@@ -97,14 +97,14 @@
             <form action="{{ route('login') }}" method="POST">
                 @csrf
 
-                <!-- Email Input -->
+                <!-- Login Identifier -->
                 <div class="mb-3">
-                    <label for="email" class="form-label fw-semibold small text-secondary">Email Pengguna / NIP</label>
+                    <label for="login" class="form-label fw-semibold small text-secondary">Email atau Username</label>
                     <div class="input-group">
-                        <span class="input-group-text bg-light text-secondary border-end-0"><i class="bi bi-envelope"></i></span>
-                        <input type="email" class="form-control bg-light border-start-0 @error('email') is-invalid @enderror" id="email" name="email" value="{{ old('email') }}" placeholder="contoh: admin@sipelita.id" required autofocus>
+                        <span class="input-group-text bg-light text-secondary border-end-0"><i class="bi bi-person"></i></span>
+                        <input type="text" class="form-control bg-light border-start-0 @error('login') is-invalid @enderror" id="login" name="login" value="{{ old('login') }}" placeholder="Masukkan email atau username" required autofocus>
                     </div>
-                    @error('email')
+                    @error('login')
                         <div class="text-danger small mt-1">{{ $message }}</div>
                     @enderror
                 </div>
