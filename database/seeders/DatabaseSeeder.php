@@ -65,6 +65,11 @@ class DatabaseSeeder extends Seeder
             'kode_unit' => 'UNIT-TPP',
         ]);
 
+        $unitKeuangan = UnitKerja::create([
+            'nama_unit' => 'KEUANGAN',
+            'kode_unit' => 'UNIT-KEU',
+        ]);
+
         $unitDireksi = UnitKerja::create([
             'nama_unit' => 'DIREKSI dan Manajemen',
             'kode_unit' => 'UNIT-DIR',
@@ -73,6 +78,7 @@ class DatabaseSeeder extends Seeder
 // Password semua akun default: password123
         $admin = User::create([
             'name' => 'Administrator SIMRS',
+            'username' => 'admin',
             'email' => 'admin@sipelita.com',
             'password' => Hash::make('password123'),
             'unit_kerja_id' => $unitSIMRS->id,
@@ -80,6 +86,7 @@ class DatabaseSeeder extends Seeder
         ]);
         $userIGD = User::create([
             'name' => 'User IGD',
+            'username' => 'userigd',
             'email' => 'userigd@sipelita.com',
             'password' => Hash::make('password123'),
             'unit_kerja_id' => $unitIGD->id,
@@ -87,6 +94,7 @@ class DatabaseSeeder extends Seeder
         ]);
         $kepalaIGD = User::create([
             'name' => 'Kepala IGD',
+            'username' => 'kepalaigd',
             'email' => 'karuigd@sipelita.com',
             'password' => Hash::make('password123'),
             'unit_kerja_id' => $unitIGD->id,
@@ -94,6 +102,7 @@ class DatabaseSeeder extends Seeder
         ]);
         $direksi = User::create([
             'name' => 'Direksi Rumah Sakit',
+            'username' => 'direksi',
             'email' => 'direksi@sipelita.com',
             'password' => Hash::make('password123'),
             'unit_kerja_id' => $unitDireksi->id,
@@ -123,5 +132,11 @@ class DatabaseSeeder extends Seeder
             'status_aktif' => true,
         ]);
 
+        $masterTrouble = MasterLaporan::create([
+            'nama_laporan' => 'Trouble Report',
+            'jenis_laporan' => 'Insidentil',
+            'deskripsi' => 'Laporan mengenai masalah atau kendala yang terjadi di rumah sakit.',
+            'status_aktif' => true,
+        ]);
     }
 }
